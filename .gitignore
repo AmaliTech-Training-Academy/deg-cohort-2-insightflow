@@ -1,0 +1,42 @@
+## Build artifacts
+target/
+*.class
+*.jar
+*.war
+.mvn/wrapper/
+
+## IDE
+.idea/
+*.iml
+.vscode/
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.so
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+## Env & secrets
+.env
+.env.local
+.env.*.local
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs & uploads
+*.log
+/uploads/
+
+## Docker overrides
+docker-compose.override.yml
