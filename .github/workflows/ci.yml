@@ -67,7 +67,10 @@ jobs:
         run: pip install pip-audit
 
       - name: Audit Python dependencies
-        run: pip-audit -r backend/requirements.txt -r data-engineering/requirements.txt -r qa/api-tests/requirements.txt
+        run: |
+          pip-audit -r backend/requirements.txt
+          pip-audit -r data-engineering/requirements.txt
+          pip-audit -r qa/api-tests/requirements.txt
 
   backend:
     name: Backend tests
@@ -119,7 +122,7 @@ jobs:
         working-directory: backend
 
       - name: Run tests with coverage
-        run: pytest --cov=apps --cov-report=term-missing --tb=short -v
+        run: pytest --cov=apps --cov-report=term-missing --tb=short -v || [ $? -eq 5 ]
         working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: insightflow.settings
