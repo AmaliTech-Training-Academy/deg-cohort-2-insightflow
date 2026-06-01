@@ -6,14 +6,12 @@ on:
   pull_request:
     branches: [main, dev]
 
-env:
-  DJANGO_SECRET_KEY: ci-secret-key-not-for-production
-  DB_NAME: insightflow_app
-  DB_USER: postgres
-  DB_PASSWORD: postgres
-  DB_HOST: localhost
-  DB_PORT: "5432"
-  DEBUG: "False"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   lint:
@@ -41,6 +39,30 @@ jobs:
       - name: Type check (mypy)
         run: mypy backend/apps backend/insightflow data-engineering qa/api-tests --config-file pyproject.toml
 
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        run: pip-audit -r backend/requirements.txt -r data-engineering/requirements.txt -r qa/api-tests/requirements.txt
+
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -60,6 +82,15 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+      DB_NAME: insightflow_app
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DEBUG: "False"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +101,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest-django pytest-cov
         working-directory: backend
 
       - name: Django system check
@@ -81,8 +112,8 @@ jobs:
         run: python manage.py migrate --noinput
         working-directory: backend
 
-      - name: Run tests
-        run: python manage.py test --verbosity=2
+      - name: Run tests with coverage
+        run: pytest --cov=apps --cov-fail-under=60 --tb=short -v
         working-directory: backend
 
   data-engineering:
@@ -130,6 +161,15 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+      DB_NAME: insightflow_app
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DEBUG: "False"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -146,13 +186,23 @@ jobs:
         run: pip install -r requirements.txt
         working-directory: qa/api-tests
 
-      - name: Start backend server
-        working-directory: backend
+      - name: Run migrations and seed data
         run: |
           python manage.py migrate --noinput
           python manage.py seed_data
-          python manage.py runserver &
-          sleep 5
+        working-directory: backend
+
+      - name: Start backend server
+        run: gunicorn insightflow.wsgi:application --bind 0.0.0.0:8000 --daemon --workers 2
+        working-directory: backend
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8000/api-docs/ && break
+            echo "Waiting for server... ($i/15)"
+            sleep 2
+          done
 
       - name: Syntax check tests
         run: python -m py_compile tests/test_api.py conftest.py
@@ -163,3 +213,21 @@ jobs:
         working-directory: qa/api-tests
         env:
           API_BASE_URL: http://localhost:8000
+
+  docker:
+    name: Docker build & scan
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend Docker image
+        run: docker build -t insightflow-backend:ci ./backend
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: insightflow-backend:ci
+          exit-code: "1"
+          severity: CRITICAL
