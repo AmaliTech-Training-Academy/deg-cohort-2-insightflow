@@ -19,7 +19,14 @@ ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
 explicit_package_bases = true
-exclude = ["migrations/", "\\.venv/", "venv/", "data_eng/"]
+exclude = [
+    "migrations/",
+    "\\.venv/",
+    "venv/",
+    "data_eng/",
+    "qa/data-engineering/conftest\\.py",
+    "qa/api-tests/conftest\\.py",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests", "qa"]

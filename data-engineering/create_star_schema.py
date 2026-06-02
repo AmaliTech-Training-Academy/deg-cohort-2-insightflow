@@ -1,17 +1,8 @@
-"""
-Create the insightflow_star_schema on the target warehouse database.
+"""Create the InsightFlow star-schema on the target warehouse database.
 
 Reads DDL from warehouse/schema.sql and executes every statement against
 the warehouse connection configured via environment variables.  Safe to run
 multiple times (all statements use IF NOT EXISTS).
-"""
-
-import logging
-import re
-from pathlib import Path
-
-from config import DATABASE_URL
-from sqlalchemy import create_engine, text
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
