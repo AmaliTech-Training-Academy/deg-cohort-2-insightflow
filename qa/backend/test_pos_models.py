@@ -1,12 +1,14 @@
 """
 Tests for POS models (Cashier, PosTransaction, PosTransactionLine).
 """
-import pytest
+
 from decimal import Decimal
+
+import pytest
+from apps.ingestion.models.inventory import Category, Product, Store
+from apps.ingestion.models.pos import Cashier, PosTransaction, PosTransactionLine
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from apps.ingestion.models.inventory import Store, Category, Product
-from apps.ingestion.models.pos import Cashier, PosTransaction, PosTransactionLine
 
 User = get_user_model()
 
@@ -61,7 +63,7 @@ class TestCashierModel:
 
     def test_cashier_deletion_cascade_on_store(self):
         """Test deleting a store cascades to cashiers."""
-        cashier = Cashier.objects.create(
+        cashier = Cashier.objects.create(  # noqa F841
             cashierId=1, storeId=self.store, fullName="John Doe", userId=self.user
         )
         self.store.delete()
@@ -69,7 +71,7 @@ class TestCashierModel:
 
     def test_cashier_deletion_cascade_on_user(self):
         """Test deleting a user cascades to cashiers."""
-        cashier = Cashier.objects.create(
+        cashier = Cashier.objects.create(  # noqa F841
             cashierId=1, storeId=self.store, fullName="John Doe", userId=self.user
         )
         self.user.delete()
@@ -145,7 +147,7 @@ class TestPosTransactionModel:
 
     def test_pos_transaction_deletion_cascade_on_store(self):
         """Test deleting a store cascades to transactions."""
-        transaction = PosTransaction.objects.create(
+        transaction = PosTransaction.objects.create(  # noqa F841
             posTransactionId=1,
             storeId=self.store,
             cashierId=self.cashier,
@@ -156,7 +158,7 @@ class TestPosTransactionModel:
 
     def test_pos_transaction_deletion_cascade_on_cashier(self):
         """Test deleting a cashier cascades to transactions."""
-        transaction = PosTransaction.objects.create(
+        transaction = PosTransaction.objects.create(  # noqa F841
             posTransactionId=1,
             storeId=self.store,
             cashierId=self.cashier,
@@ -269,7 +271,7 @@ class TestPosTransactionLineModel:
 
     def test_pos_transaction_line_deletion_cascade(self):
         """Test deleting a transaction cascades to lines."""
-        line = PosTransactionLine.objects.create(
+        line = PosTransactionLine.objects.create(  # noqa F841
             lineId=1,
             posTransactionId=self.transaction,
             productSKU=self.product,
@@ -296,13 +298,14 @@ class TestPosTransactionLineModel:
                 discountApplied=Decimal("0.00"),
                 totalAmount=Decimal(f"{10 * i}.00"),
             )
-        assert PosTransactionLine.objects.filter(
-            posTransactionId=self.transaction
-        ).count() == 3
+        assert (
+            PosTransactionLine.objects.filter(posTransactionId=self.transaction).count()
+            == 3
+        )
 
     def test_pos_transaction_line_product_deletion(self):
         """Test deleting a product cascades to transaction lines."""
-        line = PosTransactionLine.objects.create(
+        line = PosTransactionLine.objects.create(  # noqa F841
             lineId=1,
             posTransactionId=self.transaction,
             productSKU=self.product,

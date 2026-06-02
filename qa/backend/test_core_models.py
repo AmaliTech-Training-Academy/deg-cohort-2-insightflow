@@ -1,10 +1,12 @@
 """
 Tests for the core models.
 """
+
 import pytest
+from apps.core.models import TimeStampedModel
+from apps.ingestion.models.inventory import Store
 from django.db import models
 from django.utils import timezone
-from apps.core.models import TimeStampedModel
 
 
 @pytest.mark.django_db
@@ -50,15 +52,12 @@ class TestTimeStampedModel:
         assert field.null is False
 
     def test_concrete_model_inherits_timestamps(self):
-        """Test that a concrete model inheriting from TimeStampedModel has timestamp fields."""
-        from apps.ingestion.models.inventory import Store
 
         assert hasattr(Store, "created_at")
         assert hasattr(Store, "updated_at")
 
     def test_concrete_model_timestamps_work(self):
         """Test that timestamps work on concrete model instances."""
-        from apps.ingestion.models.inventory import Store
 
         store = Store.objects.create(storeId=1, storeName="Test Store", province="Test")
         assert store.created_at is not None
@@ -68,13 +67,13 @@ class TestTimeStampedModel:
 
     def test_updated_at_changes_on_save(self):
         """Test that updated_at changes when model is saved."""
-        from apps.ingestion.models.inventory import Store
 
         store = Store.objects.create(storeId=1, storeName="Test Store", province="Test")
         original_updated = store.updated_at
         created = store.created_at
 
         import time
+
         time.sleep(0.1)
 
         store.storeName = "Updated Store"
@@ -86,12 +85,12 @@ class TestTimeStampedModel:
 
     def test_created_at_does_not_change_on_update(self):
         """Test that created_at does not change when model is updated."""
-        from apps.ingestion.models.inventory import Store
 
         store = Store.objects.create(storeId=1, storeName="Test Store", province="Test")
         original_created = store.created_at
 
         import time
+
         time.sleep(0.1)
 
         store.storeName = "Updated Store"

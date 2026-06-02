@@ -1,14 +1,15 @@
 """
 Tests for online order models (OnlineOrder, OnlineOrderLine).
 """
-import pytest
+
 from decimal import Decimal
-from datetime import datetime
-from django.contrib.auth import get_user_model
-from django.utils import timezone
+
+import pytest
 from apps.ingestion.models.base import Customer
 from apps.ingestion.models.inventory import Category, Product
 from apps.ingestion.models.online_orders import OnlineOrder, OnlineOrderLine
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -22,7 +23,9 @@ class TestOnlineOrderModel:
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="pass"
         )
-        self.customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
+        self.customer = Customer.objects.create(
+            customerId="CUST-000001", userId=self.user
+        )
 
     def test_create_online_order(self):
         """Test creating an online order."""
@@ -85,7 +88,7 @@ class TestOnlineOrderModel:
 
     def test_online_order_deletion_cascade(self):
         """Test deleting a customer cascades to orders."""
-        order = OnlineOrder.objects.create(
+        order = OnlineOrder.objects.create(  # noqa F841
             onlineOrderId=1,
             customerId=self.customer,
             orderDatetime=timezone.now(),
@@ -130,7 +133,9 @@ class TestOnlineOrderLineModel:
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="pass"
         )
-        self.customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
+        self.customer = Customer.objects.create(
+            customerId="CUST-000001", userId=self.user
+        )
         self.order = OnlineOrder.objects.create(
             onlineOrderId=1,
             customerId=self.customer,
@@ -209,7 +214,7 @@ class TestOnlineOrderLineModel:
 
     def test_online_order_line_deletion_cascade(self):
         """Test deleting an order cascades to order lines."""
-        line = OnlineOrderLine.objects.create(
+        line = OnlineOrderLine.objects.create(  # noqa F841
             lineId=1,
             onlineOrderId=self.order,
             productSKU=self.product,
@@ -256,7 +261,7 @@ class TestOnlineOrderLineModel:
 
     def test_online_order_line_product_deletion(self):
         """Test deleting a product cascades to order lines."""
-        line = OnlineOrderLine.objects.create(
+        line = OnlineOrderLine.objects.create(  # noqa F841
             lineId=1,
             onlineOrderId=self.order,
             productSKU=self.product,

@@ -1,9 +1,9 @@
 """
 Tests for inventory models (Store, Category, Product, Inventory).
 """
+
 import pytest
-from django.db import IntegrityError
-from apps.ingestion.models.inventory import Store, Category, Product, Inventory
+from apps.ingestion.models.inventory import Category, Inventory, Product, Store
 
 
 @pytest.mark.django_db
@@ -51,9 +51,7 @@ class TestStoreModel:
 
     def test_store_deletion(self):
         """Test deleting a store."""
-        store = Store.objects.create(
-            storeId=1, storeName="Test", province="Ontario"
-        )
+        store = Store.objects.create(storeId=1, storeName="Test", province="Ontario")
         store_id = store.storeId
         store.delete()
         assert Store.objects.filter(storeId=store_id).exists() is False
@@ -189,7 +187,7 @@ class TestProductModel:
     def test_product_deletion_cascade(self):
         """Test deleting a category cascades to products."""
         category = Category.objects.create(categoryId=1, name="Electronics")
-        product = Product.objects.create(
+        product = Product.objects.create(  # noqa F841
             productSKU="PROD-0000001", productName="Laptop", categoryId=category
         )
         category.delete()
@@ -217,6 +215,7 @@ class TestInventoryModel:
     def test_create_inventory(self):
         """Test creating an inventory entry."""
         from datetime import date
+
         inventory = Inventory.objects.create(
             inventoryId=1,
             productSKU=self.product,
@@ -236,6 +235,7 @@ class TestInventoryModel:
     def test_inventory_primary_key(self):
         """Test that inventoryId is the primary key."""
         from datetime import date
+
         inventory = Inventory.objects.create(
             inventoryId=1,
             productSKU=self.product,
@@ -249,6 +249,7 @@ class TestInventoryModel:
     def test_inventory_stock_tracking(self):
         """Test inventory stock tracking."""
         from datetime import date
+
         inventory = Inventory.objects.create(
             inventoryId=1,
             productSKU=self.product,
@@ -264,7 +265,8 @@ class TestInventoryModel:
     def test_inventory_deletion_cascade(self):
         """Test deleting a product cascades to inventory."""
         from datetime import date
-        inventory = Inventory.objects.create(
+
+        inventory = Inventory.objects.create(  # noqa F841
             inventoryId=1,
             productSKU=self.product,
             currentStockQty=100,
@@ -277,6 +279,7 @@ class TestInventoryModel:
     def test_inventory_multiple_entries(self):
         """Test creating multiple inventory entries."""
         from datetime import date
+
         for i in range(1, 4):
             product = Product.objects.create(
                 productName=f"Product {i}", categoryId=self.category

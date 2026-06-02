@@ -1,17 +1,16 @@
 """
 Pytest configuration and fixtures for backend tests.
 """
-import sys
+
 import os
-import django
+import sys
 from pathlib import Path
 
-# Add backend directory to Python path
+import django
+import pytest
+
 backend_path = Path(__file__).parent.parent.parent / "backend"
 sys.path.insert(0, str(backend_path))
-
-import pytest
-from django.conf import settings
 
 
 def pytest_configure():

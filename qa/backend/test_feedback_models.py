@@ -1,14 +1,15 @@
 """
 Tests for the FeedbackSurvey model.
 """
-import pytest
+
 from datetime import date
+
+import pytest
+from apps.ingestion.models.base import Customer
+from apps.ingestion.models.feedback import FeedbackSurvey
+from apps.ingestion.models.online_orders import OnlineOrder
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from apps.ingestion.models.base import Customer
-from apps.ingestion.models.inventory import Category, Product
-from apps.ingestion.models.online_orders import OnlineOrder
-from apps.ingestion.models.feedback import FeedbackSurvey
 
 User = get_user_model()
 
@@ -22,7 +23,9 @@ class TestFeedbackSurveyModel:
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="pass"
         )
-        self.customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
+        self.customer = Customer.objects.create(
+            customerId="CUST-000001", userId=self.user
+        )
         self.order = OnlineOrder.objects.create(
             onlineOrderId=1,
             customerId=self.customer,
@@ -192,7 +195,7 @@ class TestFeedbackSurveyModel:
 
     def test_feedback_survey_deletion_cascade_on_customer(self):
         """Test deleting a customer cascades to feedback surveys."""
-        survey = FeedbackSurvey.objects.create(
+        survey = FeedbackSurvey.objects.create(  # noqa F841
             responseId=1,
             customerId=self.customer,
             onlineOrderId=self.order,

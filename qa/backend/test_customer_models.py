@@ -1,9 +1,10 @@
 """
 Tests for the Customer model in ingestion app.
 """
+
 import pytest
-from django.contrib.auth import get_user_model
 from apps.ingestion.models.base import Customer
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
@@ -45,25 +46,19 @@ class TestCustomerModel:
 
     def test_customer_primary_key(self):
         """Test that customerId is the primary key."""
-        customer = Customer.objects.create(
-            customerId="CUST-000001", userId=self.user
-        )
+        customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
         customer2 = Customer.objects.get(pk="CUST-000001")
         assert customer2.customerId == customer.customerId
 
     def test_customer_foreign_key_to_user(self):
         """Test customer foreign key relationship to user."""
-        customer = Customer.objects.create(
-            customerId="CUST-000001", userId=self.user
-        )
+        customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
         assert customer.userId.username == "testuser"
         assert customer.userId.email == "test@example.com"
 
     def test_customer_update(self):
         """Test updating a customer."""
-        customer = Customer.objects.create(
-            customerId="CUST-000001", userId=self.user
-        )
+        customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
         new_user = User.objects.create_user(
             username="newuser", email="new@example.com", password="pass"
         )
@@ -74,7 +69,7 @@ class TestCustomerModel:
 
     def test_customer_deletion_on_user_delete(self):
         """Test that deleting a user cascades to customer."""
-        customer = Customer.objects.create(
+        customer = Customer.objects.create(  # noqa: F841
             customerId="CUST-000001", userId=self.user
         )
         self.user.delete()
@@ -102,16 +97,14 @@ class TestCustomerModel:
 
         customer1 = Customer.objects.create(userId=self.user)
         customer2 = Customer.objects.create(userId=user2)
-        customer3 = Customer.objects.create(userId=user3)
+        customer3 = Customer.objects.create(userId=user3)  # noqa: F841
 
         assert Customer.objects.count() == 3
         assert customer1.userId != customer2.userId
 
     def test_customer_string_representation(self):
         """Test customer string representation."""
-        customer = Customer.objects.create(
-            customerId="CUST-000001", userId=self.user
-        )
+        customer = Customer.objects.create(customerId="CUST-000001", userId=self.user)
         assert str(customer.customerId) == "CUST-000001"
 
     def test_customer_without_auto_id_on_save(self):
