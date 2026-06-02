@@ -15,13 +15,13 @@ log = logging.getLogger("insightflow.quality")
 # Minimum acceptable quality scores per table (0–1)
 # ---------------------------------------------------------------------------
 QUALITY_THRESHOLDS: dict[str, float] = {
-    "pos_transactions": 0.95,
-    "online_orders": 0.95,
+    "posTransactions": 0.95,
+    "onlineOrders": 0.95,
     "feedback": 0.90,
     "inventory": 0.98,
-    "fact_sales": 0.95,
-    "fact_feedback": 0.90,
-    "fact_inventory_snapshot": 0.98,
+    "factSales": 0.95,
+    "factFeedback": 0.90,
+    "factInventorySnapshot": 0.98,
 }
 
 
@@ -63,10 +63,10 @@ class DataQualityChecker:
         return df["quantity"] > 0
 
     def check_positive_prices(self, df: pd.DataFrame) -> pd.Series:
-        """unit_price must be > 0."""
-        if "unit_price" not in df.columns:
+        """unitPrice must be > 0."""
+        if "unitPrice" not in df.columns:
             return pd.Series(True, index=df.index)
-        return df["unit_price"] > 0
+        return df["unitPrice"] > 0
 
     def check_date_not_future(self, df: pd.DataFrame, date_col: str) -> pd.Series:
         """date_col must be <= today."""
@@ -77,13 +77,13 @@ class DataQualityChecker:
         return col.notna() & (col <= today)
 
     def check_discount_range(self, df: pd.DataFrame, discount_col: str) -> pd.Series:
-        """0 <= discount_col < unit_price."""
+        """0 <= discount_col < unitPrice."""
         if discount_col not in df.columns:
             return pd.Series(True, index=df.index)
         discount = pd.to_numeric(df[discount_col], errors="coerce").fillna(0)
         lower_ok = discount >= 0
-        if "unit_price" in df.columns:
-            price = pd.to_numeric(df["unit_price"], errors="coerce").fillna(0)
+        if "unitPrice" in df.columns:
+            price = pd.to_numeric(df["unitPrice"], errors="coerce").fillna(0)
             upper_ok = discount < price
         else:
             upper_ok = pd.Series(True, index=df.index)

@@ -170,16 +170,16 @@ def run_pipeline(since: date | None = None) -> None:
     # Tag channel before combining
     if not pos_df.empty:
         pos_df["channel"] = "POS"
-        pos_df["payment_method"] = None
-        pos_df["order_status"] = None
-        pos_df["customer_id"] = None
+        pos_df["paymentMethod"] = None
+        pos_df["orderStatus"] = None
+        pos_df["customerId"] = None
 
     if not online_df.empty:
         online_df["channel"] = "Online"
-        online_df["store_id"] = None
-        online_df["store_name"] = None
-        online_df["cashier_id"] = None
-        online_df["cashier_name"] = None
+        online_df["storeId"] = None
+        online_df["storeName"] = None
+        online_df["cashierId"] = None
+        online_df["cashierName"] = None
 
     # ------------------------------------------------------------------
     # 3. Data quality checks
@@ -191,12 +191,12 @@ def run_pipeline(since: date | None = None) -> None:
         alert_mgr_pos = AlertManager()
         pos_summary = _run_quality_checks(
             pos_df,
-            "pos_transactions",
+            "posTransactions",
             checker,
             alert_mgr_pos,
-            key_cols=["source_transaction_id", "product_sku"],
-            date_col="transaction_datetime",
-            discount_col="discount_applied",
+            key_cols=["sourceTransactionId", "productSKU"],
+            date_col="transactionDatetime",
+            discount_col="discountApplied",
         )
         if alert_mgr_pos.to_dict():
             alert_mgr_pos.flush(pos_summary)
@@ -206,12 +206,12 @@ def run_pipeline(since: date | None = None) -> None:
         alert_mgr_online = AlertManager()
         online_summary = _run_quality_checks(
             online_df,
-            "online_orders",
+            "onlineOrders",
             checker,
             alert_mgr_online,
-            key_cols=["source_transaction_id", "product_sku"],
-            date_col="transaction_datetime",
-            discount_col="discount_applied",
+            key_cols=["sourceTransactionId", "productSKU"],
+            date_col="transactionDatetime",
+            discount_col="discountApplied",
         )
         if alert_mgr_online.to_dict():
             alert_mgr_online.flush(online_summary)
@@ -226,28 +226,28 @@ def run_pipeline(since: date | None = None) -> None:
                 (
                     "null_keys",
                     lambda d: checker.check_null_keys(
-                        d, ["customer_id", "source_order_id"]
+                        d, ["customerId", "sourceOrderId"]
                     ),
                 ),
                 (
                     "date_not_future",
-                    lambda d: checker.check_date_not_future(d, "submission_date"),
+                    lambda d: checker.check_date_not_future(d, "submissionDate"),
                 ),
                 (
                     "satisfaction_range",
-                    lambda d: checker.check_score_range(d, "satisfaction_score", 1, 10),
+                    lambda d: checker.check_score_range(d, "satisfactionScore", 1, 10),
                 ),
                 (
                     "nps_range",
-                    lambda d: checker.check_score_range(d, "nps_score", 0, 10),
+                    lambda d: checker.check_score_range(d, "npsScore", 0, 10),
                 ),
                 (
                     "product_rating_range",
-                    lambda d: checker.check_score_range(d, "product_rating", 1, 5),
+                    lambda d: checker.check_score_range(d, "productRating", 1, 5),
                 ),
                 (
                     "delivery_rating_range",
-                    lambda d: checker.check_score_range(d, "delivery_rating", 1, 5),
+                    lambda d: checker.check_score_range(d, "deliveryRating", 1, 5),
                 ),
             ],
         )
@@ -263,7 +263,7 @@ def run_pipeline(since: date | None = None) -> None:
             "inventory",
             checker,
             alert_mgr_inv,
-            key_cols=["product_sku"],
+            key_cols=["productSKU"],
         )
         if alert_mgr_inv.to_dict():
             alert_mgr_inv.flush(inv_summary)
@@ -288,8 +288,8 @@ def run_pipeline(since: date | None = None) -> None:
     # Collect all transaction dates
     all_dates: list[date] = []
     for df, col in [
-        (all_sales, "transaction_datetime"),
-        (feedback_df, "submission_date"),
+        (all_sales, "transactionDatetime"),
+        (feedback_df, "submissionDate"),
         (inventory_df, None),
     ]:
         if df is not None and not df.empty:
@@ -311,9 +311,9 @@ def run_pipeline(since: date | None = None) -> None:
         transformer.build_dim_customer(
             pd.concat(
                 [
-                    df[["customer_id", "customer_name", "email"]]
+                    df[["customerId", "customerName", "email"]]
                     for df in [online_clean, feedback_df]
-                    if not df.empty and "customer_id" in df.columns
+                    if not df.empty and "customerId" in df.columns
                 ],
                 ignore_index=True,
             )
@@ -337,22 +337,22 @@ def run_pipeline(since: date | None = None) -> None:
     # Static lookup rows — ensure they exist
     channel_df = pd.DataFrame(
         [
-            {"channel_name": "POS", "channel_type": "In-Store"},
-            {"channel_name": "Online", "channel_type": "E-Commerce"},
+            {"channelName": "POS", "channelType": "In-Store"},
+            {"channelName": "Online", "channelType": "E-Commerce"},
         ]
     )
 
     payment_methods: list[str] = []
-    if not online_clean.empty and "payment_method" in online_clean.columns:
-        payment_methods = online_clean["payment_method"].dropna().unique().tolist()
+    if not online_clean.empty and "paymentMethod" in online_clean.columns:
+        payment_methods = online_clean["paymentMethod"].dropna().unique().tolist()
     payment_df = pd.DataFrame(
-        [{"method_name": m, "method_type": "Electronic"} for m in payment_methods]
+        [{"methodName": m, "methodType": "Electronic"} for m in payment_methods]
     )
 
     order_statuses: list[str] = []
-    if not online_clean.empty and "order_status" in online_clean.columns:
-        order_statuses = online_clean["order_status"].dropna().unique().tolist()
-    status_df = pd.DataFrame([{"status_name": s} for s in order_statuses])
+    if not online_clean.empty and "orderStatus" in online_clean.columns:
+        order_statuses = online_clean["orderStatus"].dropna().unique().tolist()
+    status_df = pd.DataFrame([{"statusName": s} for s in order_statuses])
 
     # ------------------------------------------------------------------
     # 5. Load — within a single transaction
@@ -365,55 +365,55 @@ def run_pipeline(since: date | None = None) -> None:
     with warehouse_engine.begin() as conn:
         # --- Dimensions ---
         date_map = loader.upsert_dim_date(dates_df, conn)
-        rows_loaded["dim_date"] = len(date_map)
+        rows_loaded["dimDate"] = len(date_map)
 
         product_map = loader.upsert_dim_product(products_df, conn)
-        rows_loaded["dim_product"] = len(product_map)
+        rows_loaded["dimProduct"] = len(product_map)
 
         customer_map = (
             loader.upsert_dim_customer(customers_df, conn)
             if not customers_df.empty
             else {}
         )
-        rows_loaded["dim_customer"] = len(customer_map)
+        rows_loaded["dimCustomer"] = len(customer_map)
 
         store_map: dict = {}
         if not stores_df.empty:
             store_map_raw = loader.upsert_dim_lookup(
-                stores_df.rename(columns={"store_name": "store_name"}),
-                "dim_store",
-                "store_id",
+                stores_df,
+                "dimStore",
+                "storeId",
                 conn,
             )
             store_map = {int(k): v for k, v in store_map_raw.items()}
-        rows_loaded["dim_store"] = len(store_map)
+        rows_loaded["dimStore"] = len(store_map)
 
         geo_map: dict = {}
         if not geo_df.empty:
             geo_map_raw = loader.upsert_dim_lookup(
-                geo_df, "dim_geography", "province", conn
+                geo_df, "dimGeography", "province", conn
             )
             geo_map = geo_map_raw
-        rows_loaded["dim_geography"] = len(geo_map)
+        rows_loaded["dimGeography"] = len(geo_map)
 
         channel_map = loader.upsert_dim_lookup(
-            channel_df, "dim_channel", "channel_name", conn
+            channel_df, "dimChannel", "channelName", conn
         )
-        rows_loaded["dim_channel"] = len(channel_map)
+        rows_loaded["dimChannel"] = len(channel_map)
 
         payment_map: dict = {}
         if not payment_df.empty:
             payment_map = loader.upsert_dim_lookup(
-                payment_df, "dim_payment_method", "method_name", conn
+                payment_df, "dimPaymentMethod", "methodName", conn
             )
-        rows_loaded["dim_payment_method"] = len(payment_map)
+        rows_loaded["dimPaymentMethod"] = len(payment_map)
 
         status_map: dict = {}
         if not status_df.empty:
             status_map = loader.upsert_dim_lookup(
-                status_df, "dim_order_status", "status_name", conn
+                status_df, "dimOrderStatus", "statusName", conn
             )
-        rows_loaded["dim_order_status"] = len(status_map)
+        rows_loaded["dimOrderStatus"] = len(status_map)
 
         # --- Facts ---
         key_maps_sales: dict = {
@@ -431,9 +431,9 @@ def run_pipeline(since: date | None = None) -> None:
         n_online = loader.load_fact_sales(
             online_clean, key_maps_sales, conn, tracker, run_id
         )
-        rows_loaded["fact_sales"] = n_pos + n_online
+        rows_loaded["factSales"] = n_pos + n_online
 
-        rows_loaded["fact_feedback"] = loader.load_fact_feedback(
+        rows_loaded["factFeedback"] = loader.load_fact_feedback(
             feedback_df, key_maps_sales, conn, tracker, run_id
         )
 
@@ -442,7 +442,7 @@ def run_pipeline(since: date | None = None) -> None:
             "products": product_map,
             "snapshot_date": snapshot_date,
         }
-        rows_loaded["fact_inventory_snapshot"] = loader.load_fact_inventory(
+        rows_loaded["factInventorySnapshot"] = loader.load_fact_inventory(
             inventory_df, key_maps_inv, conn, tracker, run_id
         )
 

@@ -14,7 +14,7 @@ _RUN_ID = "run-test-001"
 
 def _make_event(
     run_id: str = _RUN_ID,
-    target_table: str = "fact_sales",
+    target_table: str = "factSales",
 ) -> LineageEvent:
     """Return a minimal LineageEvent for testing."""
     return LineageEvent(
@@ -75,13 +75,13 @@ def test_lineage_json_contains_run_id(tmp_path: Path) -> None:
 def test_get_source_records_returns_dict_list(tmp_path: Path) -> None:
     """get_source_records must return a non-empty list for a matching target_table."""
     tracker = LineageTracker(run_id=_RUN_ID)
-    tracker.record(_make_event(target_table="fact_sales"))
+    tracker.record(_make_event(target_table="factSales"))
     # Also record an unrelated event that should not appear in results
-    tracker.record(_make_event(target_table="fact_feedback"))
+    tracker.record(_make_event(target_table="factFeedback"))
 
-    results = tracker.get_source_records("fact_sales", "TXN-001")
+    results = tracker.get_source_records("factSales", "TXN-001")
     assert isinstance(results, list), "get_source_records must return a list"
-    assert len(results) > 0, "Expected at least one result for fact_sales"
+    assert len(results) > 0, "Expected at least one result for factSales"
     assert all(isinstance(r, dict) for r in results), "Each result must be a dict"
     # Verify the returned entry points to the correct source table
     assert results[0]["source_table"] == "posTransaction"

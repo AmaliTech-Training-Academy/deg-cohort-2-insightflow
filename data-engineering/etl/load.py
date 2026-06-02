@@ -25,17 +25,17 @@ class Loader:
         self._tracker = tracker
 
     # ------------------------------------------------------------------
-    # dim_date
+    # dimDate
     # ------------------------------------------------------------------
 
     def upsert_dim_date(
         self, dates_df: pd.DataFrame, conn: Connection
     ) -> dict[date, int]:
-        """INSERT … ON CONFLICT (full_date) DO NOTHING.
+        """INSERT … ON CONFLICT ("fullDate") DO NOTHING.
 
         Returns
         -------
-        dict[date, date_key]
+        dict[date, dateKey]
         """
         if dates_df.empty:
             return {}
@@ -43,13 +43,13 @@ class Loader:
         rows = dates_df.to_dict(orient="records")
         conn.execute(
             text("""
-                INSERT INTO dim_date
-                    (full_date, year, quarter, month, month_name,
-                     week_number, day_name, is_weekend, is_public_holiday)
+                INSERT INTO "dimDate"
+                    ("fullDate", year, quarter, month, "monthName",
+                     "weekNumber", "dayName", "isWeekend", "isPublicHoliday")
                 VALUES
-                    (:full_date, :year, :quarter, :month, :month_name,
-                     :week_number, :day_name, :is_weekend, :is_public_holiday)
-                ON CONFLICT (full_date) DO NOTHING
+                    (:fullDate, :year, :quarter, :month, :monthName,
+                     :weekNumber, :dayName, :isWeekend, :isPublicHoliday)
+                ON CONFLICT ("fullDate") DO NOTHING
                 """),
             rows,
         )
@@ -57,11 +57,11 @@ class Loader:
         # Fetch the keys for all dates we just upserted
         result = conn.execute(
             text(
-                "SELECT full_date, date_key FROM dim_date WHERE full_date = ANY(:dates)"
+                'SELECT "fullDate", "dateKey" FROM "dimDate" WHERE "fullDate" = ANY(:dates)'
             ),
-            {"dates": [r["full_date"] for r in rows]},
+            {"dates": [r["fullDate"] for r in rows]},
         )
-        mapping: dict[date, int] = {row.full_date: row.date_key for row in result}
+        mapping: dict[date, int] = {row[0]: row[1] for row in result}
         log.info(
             "upsert_dim_date: %d dates upserted, %d keys fetched",
             len(rows),
@@ -70,21 +70,21 @@ class Loader:
         return mapping
 
     # ------------------------------------------------------------------
-    # dim_product  (SCD Type 2)
+    # dimProduct  (SCD Type 2)
     # ------------------------------------------------------------------
 
     def upsert_dim_product(
         self, products_df: pd.DataFrame, conn: Connection
     ) -> dict[str, int]:
-        """SCD Type 2 upsert for dim_product.
+        """SCD Type 2 upsert for dimProduct.
 
         * New SKUs are inserted.
-        * Existing SKUs with changed product_name or category_name are expired
-          (valid_to = today, is_current = False) and a new row is inserted.
+        * Existing SKUs with changed productName or categoryName are expired
+          (validTo = today, isCurrent = False) and a new row is inserted.
 
         Returns
         -------
-        dict[sku, product_key]
+        dict[sku, productKey]
         """
         if products_df.empty:
             return {}
@@ -93,16 +93,16 @@ class Loader:
         sku_to_key: dict[str, int] = {}
 
         for _, row in products_df.iterrows():
-            sku = row["product_sku"]
-            product_name = row.get("product_name")
-            category_name = row.get("category_name")
+            sku = row["productSKU"]
+            product_name = row.get("productName")
+            category_name = row.get("categoryName")
 
             # Fetch the current active row for this SKU
             existing = conn.execute(
                 text("""
-                    SELECT product_key, product_name, category_name
-                    FROM dim_product
-                    WHERE product_sku = :sku AND is_current = TRUE
+                    SELECT "productKey", "productName", "categoryName"
+                    FROM "dimProduct"
+                    WHERE "productSKU" = :sku AND "isCurrent" = TRUE
                     LIMIT 1
                     """),
                 {"sku": sku},
@@ -112,74 +112,74 @@ class Loader:
                 # New product — insert
                 result = conn.execute(
                     text("""
-                        INSERT INTO dim_product
-                            (product_sku, product_name, category_name,
-                             valid_from, valid_to, is_current)
+                        INSERT INTO "dimProduct"
+                            ("productSKU", "productName", "categoryName",
+                             "validFrom", "validTo", "isCurrent")
                         VALUES
-                            (:sku, :product_name, :category_name,
-                             :valid_from, NULL, TRUE)
-                        RETURNING product_key
+                            (:sku, :productName, :categoryName,
+                             :validFrom, NULL, TRUE)
+                        RETURNING "productKey"
                         """),
                     {
                         "sku": sku,
-                        "product_name": product_name,
-                        "category_name": category_name,
-                        "valid_from": today,
+                        "productName": product_name,
+                        "categoryName": category_name,
+                        "validFrom": today,
                     },
                 )
                 sku_to_key[sku] = result.scalar()
             else:
                 changed = (
-                    existing.product_name != product_name
-                    or existing.category_name != category_name
+                    existing.productName != product_name
+                    or existing.categoryName != category_name
                 )
                 if changed:
                     # Expire old row
                     conn.execute(
                         text("""
-                            UPDATE dim_product
-                            SET valid_to = :today, is_current = FALSE
-                            WHERE product_key = :pk
+                            UPDATE "dimProduct"
+                            SET "validTo" = :today, "isCurrent" = FALSE
+                            WHERE "productKey" = :pk
                             """),
-                        {"today": today, "pk": existing.product_key},
+                        {"today": today, "pk": existing.productKey},
                     )
                     # Insert new version
                     result = conn.execute(
                         text("""
-                            INSERT INTO dim_product
-                                (product_sku, product_name, category_name,
-                                 valid_from, valid_to, is_current)
+                            INSERT INTO "dimProduct"
+                                ("productSKU", "productName", "categoryName",
+                                 "validFrom", "validTo", "isCurrent")
                             VALUES
-                                (:sku, :product_name, :category_name,
-                                 :valid_from, NULL, TRUE)
-                            RETURNING product_key
+                                (:sku, :productName, :categoryName,
+                                 :validFrom, NULL, TRUE)
+                            RETURNING "productKey"
                             """),
                         {
                             "sku": sku,
-                            "product_name": product_name,
-                            "category_name": category_name,
-                            "valid_from": today,
+                            "productName": product_name,
+                            "categoryName": category_name,
+                            "validFrom": today,
                         },
                     )
                     sku_to_key[sku] = result.scalar()
                 else:
-                    sku_to_key[sku] = existing.product_key
+                    sku_to_key[sku] = existing.productKey
 
         log.info("upsert_dim_product: %d SKUs processed", len(sku_to_key))
         return sku_to_key
 
     # ------------------------------------------------------------------
-    # dim_customer  (SCD Type 2)
+    # dimCustomer  (SCD Type 2)
     # ------------------------------------------------------------------
 
     def upsert_dim_customer(
         self, customers_df: pd.DataFrame, conn: Connection
     ) -> dict[int, int]:
-        """SCD Type 2 upsert for dim_customer.
+        """SCD Type 2 upsert for dimCustomer.
 
         Returns
         -------
-        dict[customer_id, customer_key]
+        dict[customerId, customerKey]
         """
         if customers_df.empty:
             return {}
@@ -188,16 +188,16 @@ class Loader:
         cid_to_key: dict[int, int] = {}
 
         for _, row in customers_df.iterrows():
-            cid = int(row["customer_id"])
-            full_name = row.get("full_name")
+            cid = int(row["customerId"])
+            full_name = row.get("fullName")
             email = row.get("email")
-            is_active = bool(row.get("is_active", True))
+            is_active = bool(row.get("isActive", True))
 
             existing = conn.execute(
                 text("""
-                    SELECT customer_key, full_name, email, is_active
-                    FROM dim_customer
-                    WHERE customer_id = :cid AND is_active = TRUE
+                    SELECT "customerKey", "fullName", email, "isActive"
+                    FROM "dimCustomer"
+                    WHERE "customerId" = :cid AND "isActive" = TRUE
                     LIMIT 1
                     """),
                 {"cid": cid},
@@ -206,58 +206,58 @@ class Loader:
             if existing is None:
                 result = conn.execute(
                     text("""
-                        INSERT INTO dim_customer
-                            (customer_id, full_name, email,
-                             valid_from, valid_to, is_active)
+                        INSERT INTO "dimCustomer"
+                            ("customerId", "fullName", email,
+                             "validFrom", "validTo", "isActive")
                         VALUES
-                            (:cid, :full_name, :email,
-                             :valid_from, NULL, TRUE)
-                        RETURNING customer_key
+                            (:cid, :fullName, :email,
+                             :validFrom, NULL, TRUE)
+                        RETURNING "customerKey"
                         """),
                     {
                         "cid": cid,
-                        "full_name": full_name,
+                        "fullName": full_name,
                         "email": email,
-                        "valid_from": today,
+                        "validFrom": today,
                     },
                 )
                 cid_to_key[cid] = result.scalar()
             else:
                 changed = (
-                    existing.full_name != full_name
+                    existing.fullName != full_name
                     or existing.email != email
-                    or existing.is_active != is_active
+                    or existing.isActive != is_active
                 )
                 if changed:
                     conn.execute(
                         text("""
-                            UPDATE dim_customer
-                            SET valid_to = :today, is_active = FALSE
-                            WHERE customer_key = :pk
+                            UPDATE "dimCustomer"
+                            SET "validTo" = :today, "isActive" = FALSE
+                            WHERE "customerKey" = :pk
                             """),
-                        {"today": today, "pk": existing.customer_key},
+                        {"today": today, "pk": existing.customerKey},
                     )
                     result = conn.execute(
                         text("""
-                            INSERT INTO dim_customer
-                                (customer_id, full_name, email,
-                                 valid_from, valid_to, is_active)
+                            INSERT INTO "dimCustomer"
+                                ("customerId", "fullName", email,
+                                 "validFrom", "validTo", "isActive")
                             VALUES
-                                (:cid, :full_name, :email,
-                                 :valid_from, NULL, :is_active)
-                            RETURNING customer_key
+                                (:cid, :fullName, :email,
+                                 :validFrom, NULL, :isActive)
+                            RETURNING "customerKey"
                             """),
                         {
                             "cid": cid,
-                            "full_name": full_name,
+                            "fullName": full_name,
                             "email": email,
-                            "valid_from": today,
-                            "is_active": is_active,
+                            "validFrom": today,
+                            "isActive": is_active,
                         },
                     )
                     cid_to_key[cid] = result.scalar()
                 else:
-                    cid_to_key[cid] = existing.customer_key
+                    cid_to_key[cid] = existing.customerKey
 
         log.info("upsert_dim_customer: %d customers processed", len(cid_to_key))
         return cid_to_key
@@ -275,8 +275,8 @@ class Loader:
     ) -> dict[str, int]:
         """Generic INSERT … ON CONFLICT (name_col) DO NOTHING upsert.
 
-        Covers dim_store, dim_geography, dim_channel, dim_payment_method,
-        and dim_order_status.
+        Covers dimStore, dimGeography, dimChannel, dimPaymentMethod,
+        and dimOrderStatus.
 
         Returns
         -------
@@ -286,34 +286,37 @@ class Loader:
             return {}
 
         _TABLE_KEY_MAP: dict[str, str] = {
-            "dim_store": "store_key",
-            "dim_geography": "geography_key",
-            "dim_channel": "channel_key",
-            "dim_payment_method": "payment_method_key",
-            "dim_order_status": "order_status_key",
+            "dimStore": "storeKey",
+            "dimGeography": "geographyKey",
+            "dimChannel": "channelKey",
+            "dimPaymentMethod": "paymentMethodKey",
+            "dimOrderStatus": "orderStatusKey",
         }
-        pk_col = _TABLE_KEY_MAP.get(table, f"{table.replace('dim_', '')}_key")
+        if table not in _TABLE_KEY_MAP:
+            raise ValueError(f"Unknown lookup table: {table!r}")
+        pk_col = _TABLE_KEY_MAP[table]
 
-        # Build column list from df
+        # Build quoted column list from df (column names are set by our own
+        # transform layer — not derived from user input)
         cols = list(df.columns)
-        col_list = ", ".join(cols)
+        col_list = ", ".join(f'"{c}"' for c in cols)
         bind_list = ", ".join(f":{c}" for c in cols)
 
-        conn.execute(
-            text(f"""
-                INSERT INTO {table} ({col_list})
-                VALUES ({bind_list})
-                ON CONFLICT ({name_col}) DO NOTHING
-                """),
+        conn.execute(  # nosec B608 — table/col names come from internal whitelist
+            text(
+                f'INSERT INTO "{table}" ({col_list}) '
+                f'VALUES ({bind_list}) '
+                f'ON CONFLICT ("{name_col}") DO NOTHING'
+            ),
             df.to_dict(orient="records"),
         )
 
         # Fetch keys
         names = df[name_col].tolist()
-        result = conn.execute(
+        result = conn.execute(  # nosec B608 — table/col names come from internal whitelist
             text(
-                f"SELECT {name_col}, {pk_col} FROM {table}"
-                f" WHERE {name_col} = ANY(:names)"
+                f'SELECT "{name_col}", "{pk_col}" FROM "{table}"'
+                f' WHERE "{name_col}" = ANY(:names)'
             ),
             {"names": names},
         )
@@ -322,7 +325,7 @@ class Loader:
         return mapping
 
     # ------------------------------------------------------------------
-    # fact_sales
+    # factSales
     # ------------------------------------------------------------------
 
     def load_fact_sales(
@@ -333,19 +336,19 @@ class Loader:
         tracker: LineageTracker,
         run_id: str,
     ) -> int:
-        """Resolve FKs from key_maps and insert fact_sales rows.
+        """Resolve FKs from key_maps and insert factSales rows.
 
         Parameters
         ----------
         fact_df:
             Cleansed sales DataFrame.
         key_maps:
-            ``{"dates": {date: date_key}, "products": {sku: product_key},
-               "customers": {cid: customer_key}, "stores": {sid: store_key},
-               "geographies": {province: geography_key},
-               "channels": {name: channel_key},
-               "payment_methods": {name: payment_method_key},
-               "order_statuses": {name: order_status_key}}``
+            ``{"dates": {date: dateKey}, "products": {sku: productKey},
+               "customers": {cid: customerKey}, "stores": {sid: storeKey},
+               "geographies": {province: geographyKey},
+               "channels": {name: channelKey},
+               "payment_methods": {name: paymentMethodKey},
+               "order_statuses": {name: orderStatusKey}}``
         conn:
             Active SQLAlchemy connection (within a transaction).
         tracker / run_id:
@@ -361,20 +364,20 @@ class Loader:
 
         rows = []
         for _, r in fact_df.iterrows():
-            txn_dt = pd.Timestamp(r.get("transaction_datetime"))
+            txn_dt = pd.Timestamp(r.get("transactionDatetime"))
             txn_date = txn_dt.date() if pd.notna(txn_dt) else date.today()
 
             date_key = key_maps["dates"].get(txn_date)
-            product_key = key_maps["products"].get(r.get("product_sku"))
-            store_key = key_maps.get("stores", {}).get(r.get("store_id"))
-            customer_key = key_maps.get("customers", {}).get(r.get("customer_id"))
+            product_key = key_maps["products"].get(r.get("productSKU"))
+            store_key = key_maps.get("stores", {}).get(r.get("storeId"))
+            customer_key = key_maps.get("customers", {}).get(r.get("customerId"))
             geography_key = key_maps.get("geographies", {}).get(r.get("province"))
             channel_key = key_maps.get("channels", {}).get(r.get("channel", "POS"))
             payment_method_key = key_maps.get("payment_methods", {}).get(
-                r.get("payment_method")
+                r.get("paymentMethod")
             )
             order_status_key = key_maps.get("order_statuses", {}).get(
-                r.get("order_status")
+                r.get("orderStatus")
             )
 
             if (
@@ -388,38 +391,38 @@ class Loader:
 
             rows.append(
                 {
-                    "date_key": date_key,
-                    "product_key": product_key,
-                    "customer_key": customer_key,
-                    "store_key": store_key,
-                    "geography_key": geography_key,
-                    "channel_key": channel_key,
-                    "payment_method_key": payment_method_key,
-                    "order_status_key": order_status_key,
-                    "source_transaction_id": str(r.get("source_transaction_id", "")),
+                    "dateKey": date_key,
+                    "productKey": product_key,
+                    "customerKey": customer_key,
+                    "storeKey": store_key,
+                    "geographyKey": geography_key,
+                    "channelKey": channel_key,
+                    "paymentMethodKey": payment_method_key,
+                    "orderStatusKey": order_status_key,
+                    "sourceTransactionId": str(r.get("sourceTransactionId", "")),
                     "quantity": int(r.get("quantity", 0)),
-                    "unit_price": float(r.get("unit_price", 0)),
-                    "discount_applied": float(r.get("discount_applied", 0)),
-                    "gross_amount": float(r.get("gross_amount", 0)),
-                    "net_amount": float(r.get("net_amount", 0)),
+                    "unitPrice": float(r.get("unitPrice", 0)),
+                    "discountApplied": float(r.get("discountApplied", 0)),
+                    "grossAmount": float(r.get("grossAmount", 0)),
+                    "netAmount": float(r.get("netAmount", 0)),
                 }
             )
 
         if rows:
             conn.execute(
                 text("""
-                    INSERT INTO fact_sales
-                        (date_key, product_key, customer_key, store_key,
-                         geography_key, channel_key, payment_method_key,
-                         order_status_key, source_transaction_id,
-                         quantity, unit_price, discount_applied,
-                         gross_amount, net_amount)
+                    INSERT INTO "factSales"
+                        ("dateKey", "productKey", "customerKey", "storeKey",
+                         "geographyKey", "channelKey", "paymentMethodKey",
+                         "orderStatusKey", "sourceTransactionId",
+                         quantity, "unitPrice", "discountApplied",
+                         "grossAmount", "netAmount")
                     VALUES
-                        (:date_key, :product_key, :customer_key, :store_key,
-                         :geography_key, :channel_key, :payment_method_key,
-                         :order_status_key, :source_transaction_id,
-                         :quantity, :unit_price, :discount_applied,
-                         :gross_amount, :net_amount)
+                        (:dateKey, :productKey, :customerKey, :storeKey,
+                         :geographyKey, :channelKey, :paymentMethodKey,
+                         :orderStatusKey, :sourceTransactionId,
+                         :quantity, :unitPrice, :discountApplied,
+                         :grossAmount, :netAmount)
                     """),
                 rows,
             )
@@ -429,7 +432,7 @@ class Loader:
                 run_id=run_id,
                 step="load_fact_sales",
                 source_table="posTransaction/onlineOrder",
-                target_table="fact_sales",
+                target_table="factSales",
                 source_db=_SOURCE_DB,
                 target_db=_WAREHOUSE_DB,
                 rows_extracted=len(fact_df),
@@ -442,7 +445,7 @@ class Loader:
         return len(rows)
 
     # ------------------------------------------------------------------
-    # fact_feedback
+    # factFeedback
     # ------------------------------------------------------------------
 
     def load_fact_feedback(
@@ -453,7 +456,7 @@ class Loader:
         tracker: LineageTracker,
         run_id: str,
     ) -> int:
-        """Resolve FKs and insert fact_feedback rows.
+        """Resolve FKs and insert factFeedback rows.
 
         Returns
         -------
@@ -465,46 +468,46 @@ class Loader:
 
         rows = []
         for _, r in fact_df.iterrows():
-            sub_date = pd.Timestamp(r.get("submission_date"))
+            sub_date = pd.Timestamp(r.get("submissionDate"))
             sub_d = sub_date.date() if pd.notna(sub_date) else date.today()
 
             date_key = key_maps["dates"].get(sub_d)
-            customer_key = key_maps.get("customers", {}).get(r.get("customer_id"))
+            customer_key = key_maps.get("customers", {}).get(r.get("customerId"))
             geography_key = key_maps.get("geographies", {}).get(r.get("province"))
 
             if date_key is None or customer_key is None:
                 log.debug("load_fact_feedback: skipping row — missing required FK")
                 continue
 
-            free_text = r.get("free_text_comments")
+            free_text = r.get("freeTextComments")
             has_free_text = bool(free_text) and str(free_text).strip() != ""
 
             rows.append(
                 {
-                    "date_key": date_key,
-                    "customer_key": customer_key,
-                    "product_key": None,
-                    "geography_key": geography_key,
-                    "source_order_id": str(r.get("source_order_id", "")),
-                    "satisfaction_score": _safe_int(r.get("satisfaction_score")),
-                    "nps_score": _safe_int(r.get("nps_score")),
-                    "product_rating": _safe_int(r.get("product_rating")),
-                    "delivery_rating": _safe_int(r.get("delivery_rating")),
-                    "has_free_text": has_free_text,
+                    "dateKey": date_key,
+                    "customerKey": customer_key,
+                    "productKey": None,
+                    "geographyKey": geography_key,
+                    "sourceOrderId": str(r.get("sourceOrderId", "")),
+                    "satisfactionScore": _safe_int(r.get("satisfactionScore")),
+                    "npsScore": _safe_int(r.get("npsScore")),
+                    "productRating": _safe_int(r.get("productRating")),
+                    "deliveryRating": _safe_int(r.get("deliveryRating")),
+                    "hasFreeText": has_free_text,
                 }
             )
 
         if rows:
             conn.execute(
                 text("""
-                    INSERT INTO fact_feedback
-                        (date_key, customer_key, product_key, geography_key,
-                         source_order_id, satisfaction_score, nps_score,
-                         product_rating, delivery_rating, has_free_text)
+                    INSERT INTO "factFeedback"
+                        ("dateKey", "customerKey", "productKey", "geographyKey",
+                         "sourceOrderId", "satisfactionScore", "npsScore",
+                         "productRating", "deliveryRating", "hasFreeText")
                     VALUES
-                        (:date_key, :customer_key, :product_key, :geography_key,
-                         :source_order_id, :satisfaction_score, :nps_score,
-                         :product_rating, :delivery_rating, :has_free_text)
+                        (:dateKey, :customerKey, :productKey, :geographyKey,
+                         :sourceOrderId, :satisfactionScore, :npsScore,
+                         :productRating, :deliveryRating, :hasFreeText)
                     """),
                 rows,
             )
@@ -514,20 +517,20 @@ class Loader:
                 run_id=run_id,
                 step="load_fact_feedback",
                 source_table="feedbackSurvey",
-                target_table="fact_feedback",
+                target_table="factFeedback",
                 source_db=_SOURCE_DB,
                 target_db=_WAREHOUSE_DB,
                 rows_extracted=len(fact_df),
                 rows_loaded=len(rows),
                 quality_score=len(rows) / max(len(fact_df), 1),
-                transformations=["FK resolution", "has_free_text flag"],
+                transformations=["FK resolution", "hasFreeText flag"],
             )
         )
         log.info("load_fact_feedback: %d rows inserted", len(rows))
         return len(rows)
 
     # ------------------------------------------------------------------
-    # fact_inventory_snapshot
+    # factInventorySnapshot
     # ------------------------------------------------------------------
 
     def load_fact_inventory(
@@ -538,7 +541,7 @@ class Loader:
         tracker: LineageTracker,
         run_id: str,
     ) -> int:
-        """Resolve FKs and insert fact_inventory_snapshot rows.
+        """Resolve FKs and insert factInventorySnapshot rows.
 
         Returns
         -------
@@ -553,37 +556,37 @@ class Loader:
         date_key = key_maps["dates"].get(snapshot_date)
 
         for _, r in fact_df.iterrows():
-            product_key = key_maps.get("products", {}).get(r.get("product_sku"))
+            product_key = key_maps.get("products", {}).get(r.get("productSKU"))
             if date_key is None or product_key is None:
                 log.debug("load_fact_inventory: skipping row — missing required FK")
                 continue
 
-            stock_qty = int(r.get("stock_quantity", 0))
-            reorder_thresh = int(r.get("reorder_threshold", 0))
-            days_since = _safe_int(r.get("days_since_restock"))
-            location = r.get("store_name") or r.get("province") or "unknown"
+            stock_qty = int(r.get("stockQuantity", 0))
+            reorder_thresh = int(r.get("reorderThreshold", 0))
+            days_since = _safe_int(r.get("daysSinceRestock"))
+            location = r.get("storeName") or r.get("province") or "unknown"
 
             rows.append(
                 {
-                    "date_key": date_key,
-                    "product_key": product_key,
-                    "location_label": str(location),
-                    "stock_quantity": stock_qty,
-                    "reorder_threshold": reorder_thresh,
-                    "days_since_restock": days_since,
-                    "is_below_reorder": stock_qty < reorder_thresh,
+                    "dateKey": date_key,
+                    "productKey": product_key,
+                    "locationLabel": str(location),
+                    "stockQuantity": stock_qty,
+                    "reorderThreshold": reorder_thresh,
+                    "daysSinceRestock": days_since,
+                    "isBelowReorder": stock_qty < reorder_thresh,
                 }
             )
 
         if rows:
             conn.execute(
                 text("""
-                    INSERT INTO fact_inventory_snapshot
-                        (date_key, product_key, location_label, stock_quantity,
-                         reorder_threshold, days_since_restock, is_below_reorder)
+                    INSERT INTO "factInventorySnapshot"
+                        ("dateKey", "productKey", "locationLabel", "stockQuantity",
+                         "reorderThreshold", "daysSinceRestock", "isBelowReorder")
                     VALUES
-                        (:date_key, :product_key, :location_label, :stock_quantity,
-                         :reorder_threshold, :days_since_restock, :is_below_reorder)
+                        (:dateKey, :productKey, :locationLabel, :stockQuantity,
+                         :reorderThreshold, :daysSinceRestock, :isBelowReorder)
                     """),
                 rows,
             )
@@ -593,13 +596,13 @@ class Loader:
                 run_id=run_id,
                 step="load_fact_inventory",
                 source_table="inventory",
-                target_table="fact_inventory_snapshot",
+                target_table="factInventorySnapshot",
                 source_db=_SOURCE_DB,
                 target_db=_WAREHOUSE_DB,
                 rows_extracted=len(fact_df),
                 rows_loaded=len(rows),
                 quality_score=len(rows) / max(len(fact_df), 1),
-                transformations=["FK resolution", "is_below_reorder flag"],
+                transformations=["FK resolution", "isBelowReorder flag"],
             )
         )
         log.info("load_fact_inventory: %d rows inserted", len(rows))

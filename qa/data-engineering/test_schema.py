@@ -44,85 +44,85 @@ def test_dim_tables_present() -> None:
     """Schema must declare CREATE TABLE IF NOT EXISTS for every dimension."""
     sql = _load_schema()
     required_dims = [
-        "dim_date",
-        "dim_product",
-        "dim_customer",
-        "dim_store",
-        "dim_geography",
-        "dim_channel",
-        "dim_payment_method",
-        "dim_order_status",
+        "dimDate",
+        "dimProduct",
+        "dimCustomer",
+        "dimStore",
+        "dimGeography",
+        "dimChannel",
+        "dimPaymentMethod",
+        "dimOrderStatus",
     ]
     for table in required_dims:
-        pattern = rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+{re.escape(table)}"
+        pattern = rf'CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"{re.escape(table)}"'
         assert re.search(
             pattern, sql, re.IGNORECASE
-        ), f"Schema missing: CREATE TABLE IF NOT EXISTS {table}"
+        ), f'Schema missing: CREATE TABLE IF NOT EXISTS "{table}"'
 
 
 def test_fact_tables_present() -> None:
     """Schema must declare CREATE TABLE IF NOT EXISTS for every fact table."""
     sql = _load_schema()
     required_facts = [
-        "fact_sales",
-        "fact_feedback",
-        "fact_inventory_snapshot",
+        "factSales",
+        "factFeedback",
+        "factInventorySnapshot",
     ]
     for table in required_facts:
-        pattern = rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+{re.escape(table)}"
+        pattern = rf'CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"{re.escape(table)}"'
         assert re.search(
             pattern, sql, re.IGNORECASE
-        ), f"Schema missing: CREATE TABLE IF NOT EXISTS {table}"
+        ), f'Schema missing: CREATE TABLE IF NOT EXISTS "{table}"'
 
 
 def test_fact_sales_has_fks() -> None:
-    """fact_sales must REFERENCES dim_date, dim_product, dim_geography, dim_channel."""
+    """factSales must REFERENCES dimDate, dimProduct, dimGeography, dimChannel."""
     sql = _load_schema()
 
-    # Extract just the fact_sales CREATE TABLE block
+    # Extract just the factSales CREATE TABLE block
     match = re.search(
-        r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+fact_sales\s*\((.+?)\);",
+        r'CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"factSales"\s*\((.+?)\);',
         sql,
         re.IGNORECASE | re.DOTALL,
     )
-    assert match, "fact_sales CREATE TABLE block not found"
+    assert match, "factSales CREATE TABLE block not found"
     block = match.group(0)
 
-    required_refs = ["dim_date", "dim_product", "dim_geography", "dim_channel"]
+    required_refs = ["dimDate", "dimProduct", "dimGeography", "dimChannel"]
     for ref in required_refs:
-        assert f"REFERENCES {ref}" in block, f"fact_sales is missing REFERENCES {ref}"
+        assert f'REFERENCES "{ref}"' in block, f'factSales is missing REFERENCES "{ref}"'
 
 
 def test_scd2_columns_on_dim_product() -> None:
-    """dim_product must contain the SCD-2 columns: valid_from, valid_to, is_current."""
+    """dimProduct must contain the SCD-2 columns: validFrom, validTo, isCurrent."""
     sql = _load_schema()
 
     match = re.search(
-        r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+dim_product\s*\((.+?)\);",
+        r'CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"dimProduct"\s*\((.+?)\);',
         sql,
         re.IGNORECASE | re.DOTALL,
     )
-    assert match, "dim_product CREATE TABLE block not found"
+    assert match, "dimProduct CREATE TABLE block not found"
     block = match.group(0)
 
-    for col in ("valid_from", "valid_to", "is_current"):
-        assert col in block, f"dim_product missing SCD-2 column: {col}"
+    for col in ('"validFrom"', '"validTo"', '"isCurrent"'):
+        assert col in block, f"dimProduct missing SCD-2 column: {col}"
 
 
 def test_scd2_columns_on_dim_customer() -> None:
-    """dim_customer must contain the SCD-2 columns: valid_from, valid_to, is_active."""
+    """dimCustomer must contain the SCD-2 columns: validFrom, validTo, isActive."""
     sql = _load_schema()
 
     match = re.search(
-        r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+dim_customer\s*\((.+?)\);",
+        r'CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"dimCustomer"\s*\((.+?)\);',
         sql,
         re.IGNORECASE | re.DOTALL,
     )
-    assert match, "dim_customer CREATE TABLE block not found"
+    assert match, "dimCustomer CREATE TABLE block not found"
     block = match.group(0)
 
-    for col in ("valid_from", "valid_to", "is_active"):
-        assert col in block, f"dim_customer missing SCD-2 column: {col}"
+    for col in ('"validFrom"', '"validTo"', '"isActive"'):
+        assert col in block, f"dimCustomer missing SCD-2 column: {col}"
 
 
 def test_indexes_present() -> None:

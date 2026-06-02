@@ -71,14 +71,14 @@ class LineageTracker:
         Parameters
         ----------
         target_table:
-            The fact table name (e.g. ``"fact_sales"``).
+            The fact table name (e.g. ``"factSales"``).
         fact_key_value:
             The surrogate key value of the fact row being traced.
 
         Returns
         -------
         list[dict]
-            Each dict has ``source_table``, ``source_transaction_id``, and
+            Each dict has ``source_table``, ``sourceTransactionId``, and
             ``step``.  The lineage recorded at load time is used; this method
             cannot recover row-level FK mappings retrospectively, so it returns
             the step-level provenance for the given target table.
@@ -89,7 +89,7 @@ class LineageTracker:
                 results.append(
                     {
                         "source_table": event.source_table,
-                        "source_transaction_id": fact_key_value,
+                        "sourceTransactionId": fact_key_value,
                         "step": event.step,
                         "run_id": event.run_id,
                         "source_db": event.source_db,

@@ -7,7 +7,7 @@ import pytest
 from etl.transform import Transformer
 
 # ---------------------------------------------------------------------------
-# dim_date
+# dimDate
 # ---------------------------------------------------------------------------
 
 
@@ -15,37 +15,37 @@ def test_build_dim_date_columns(transformer: Transformer) -> None:
     """build_dim_date for a single date must return the required schema columns."""
     df = transformer.build_dim_date([date(2024, 1, 15)])
     required = {
-        "full_date",
+        "fullDate",
         "year",
         "quarter",
         "month",
-        "month_name",
-        "week_number",
-        "day_name",
-        "is_weekend",
-        "is_public_holiday",
+        "monthName",
+        "weekNumber",
+        "dayName",
+        "isWeekend",
+        "isPublicHoliday",
     }
     missing = required - set(df.columns)
-    assert not missing, f"dim_date is missing columns: {missing}"
+    assert not missing, f"dimDate is missing columns: {missing}"
     assert len(df) == 1
 
 
 def test_build_dim_date_weekend(transformer: Transformer) -> None:
-    """A Saturday must produce is_weekend=True."""
+    """A Saturday must produce isWeekend=True."""
     # 2024-01-06 is a Saturday
     df = transformer.build_dim_date([date(2024, 1, 6)])
-    assert bool(df.loc[0, "is_weekend"]) is True
+    assert bool(df.loc[0, "isWeekend"]) is True
 
 
 def test_build_dim_date_weekday(transformer: Transformer) -> None:
-    """A Monday must produce is_weekend=False."""
+    """A Monday must produce isWeekend=False."""
     # 2024-01-08 is a Monday
     df = transformer.build_dim_date([date(2024, 1, 8)])
-    assert bool(df.loc[0, "is_weekend"]) is False
+    assert bool(df.loc[0, "isWeekend"]) is False
 
 
 # ---------------------------------------------------------------------------
-# dim_product
+# dimProduct
 # ---------------------------------------------------------------------------
 
 
@@ -55,22 +55,22 @@ def test_build_dim_product_deduplication(
     """Duplicate SKU rows must collapse into one product row per unique SKU."""
     # sample_sales_df has SKU-A appearing twice (rows 0 and 3)
     df = transformer.build_dim_product(sample_sales_df)
-    unique_skus = sample_sales_df["product_sku"].nunique()
+    unique_skus = sample_sales_df["productSKU"].nunique()
     assert len(df) == unique_skus, f"Expected {unique_skus} product rows, got {len(df)}"
 
 
 # ---------------------------------------------------------------------------
-# dim_customer
+# dimCustomer
 # ---------------------------------------------------------------------------
 
 
 def test_build_dim_customer_sets_scd_fields(
     transformer: Transformer, sample_sales_df: pd.DataFrame
 ) -> None:
-    """build_dim_customer must include an is_active column."""
+    """build_dim_customer must include an isActive column."""
     df = transformer.build_dim_customer(sample_sales_df)
-    assert "is_active" in df.columns, "dim_customer must contain is_active"
-    assert df["is_active"].all(), "All newly built customer records should be active"
+    assert "isActive" in df.columns, "dimCustomer must contain isActive"
+    assert df["isActive"].all(), "All newly built customer records should be active"
 
 
 # ---------------------------------------------------------------------------
@@ -81,14 +81,14 @@ def test_build_dim_customer_sets_scd_fields(
 def test_cleanse_sales_drops_null_sku(
     transformer: Transformer, sample_sales_df: pd.DataFrame
 ) -> None:
-    """A row with product_sku=None must be dropped during cleansing."""
+    """A row with productSKU=None must be dropped during cleansing."""
     df = sample_sales_df.copy()
-    # Append a row with a null product_sku
+    # Append a row with a null productSKU
     null_row = df.iloc[0].copy()
-    null_row["product_sku"] = None
+    null_row["productSKU"] = None
     df = pd.concat([df, null_row.to_frame().T], ignore_index=True)
     cleansed = transformer.cleanse_sales(df)
-    assert cleansed["product_sku"].notna().all(), "Null-SKU rows must be dropped"
+    assert cleansed["productSKU"].notna().all(), "Null-SKU rows must be dropped"
     assert len(cleansed) == len(
         sample_sales_df
     ), "Only the null-SKU row should be removed"
@@ -97,26 +97,26 @@ def test_cleanse_sales_drops_null_sku(
 def test_cleanse_sales_clamps_negative_discount(
     transformer: Transformer, sample_sales_df: pd.DataFrame
 ) -> None:
-    """A negative discount_applied must be clamped to 0 after cleansing."""
+    """A negative discountApplied must be clamped to 0 after cleansing."""
     df = sample_sales_df.copy()
-    df.loc[0, "discount_applied"] = -10.0
+    df.loc[0, "discountApplied"] = -10.0
     cleansed = transformer.cleanse_sales(df)
     assert (
-        cleansed.loc[0, "discount_applied"] == 0.0
+        cleansed.loc[0, "discountApplied"] == 0.0
     ), "Negative discount must be clamped to 0"
 
 
 def test_cleanse_sales_recomputes_net_amount(
     transformer: Transformer, sample_sales_df: pd.DataFrame
 ) -> None:
-    """net_amount must equal gross_amount - discount_applied after cleansing."""
+    """netAmount must equal grossAmount - discountApplied after cleansing."""
     df = sample_sales_df.copy()
     # Fix values so the recomputed result is predictable
-    df.loc[0, "discount_applied"] = 10.0
+    df.loc[0, "discountApplied"] = 10.0
     df.loc[0, "quantity"] = 2
-    df.loc[0, "unit_price"] = 50.0
+    df.loc[0, "unitPrice"] = 50.0
     cleansed = transformer.cleanse_sales(df)
-    expected_net = cleansed.loc[0, "gross_amount"] - cleansed.loc[0, "discount_applied"]
-    assert cleansed.loc[0, "net_amount"] == pytest.approx(
+    expected_net = cleansed.loc[0, "grossAmount"] - cleansed.loc[0, "discountApplied"]
+    assert cleansed.loc[0, "netAmount"] == pytest.approx(
         expected_net
-    ), "net_amount must equal gross_amount - discount_applied"
+    ), "netAmount must equal grossAmount - discountApplied"
