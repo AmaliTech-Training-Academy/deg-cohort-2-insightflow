@@ -352,9 +352,7 @@ def run_pipeline(since: date | None = None) -> None:
     order_statuses: list[str] = []
     if not online_clean.empty and "order_status" in online_clean.columns:
         order_statuses = online_clean["order_status"].dropna().unique().tolist()
-    status_df = pd.DataFrame(
-        [{"status_name": s, "status_group": "Order"} for s in order_statuses]
-    )
+    status_df = pd.DataFrame([{"status_name": s} for s in order_statuses])
 
     # ------------------------------------------------------------------
     # 5. Load — within a single transaction
