@@ -105,9 +105,7 @@ class Transformer:
             )
         today = date.today()
         cols = [
-            c
-            for c in ["productSKU", "productName", "categoryName"]
-            if c in df.columns
+            c for c in ["productSKU", "productName", "categoryName"] if c in df.columns
         ]
         products = df[cols].drop_duplicates(subset=["productSKU"]).copy()
         if "productName" in products.columns:
@@ -157,10 +155,7 @@ class Transformer:
                 cols.append(col)
 
         customers = df[cols].drop_duplicates(subset=["customerId"]).copy()
-        if (
-            "customerName" in customers.columns
-            and "fullName" not in customers.columns
-        ):
+        if "customerName" in customers.columns and "fullName" not in customers.columns:
             customers = customers.rename(columns={"customerName": "fullName"})
         if "fullName" not in customers.columns:
             customers["fullName"] = None

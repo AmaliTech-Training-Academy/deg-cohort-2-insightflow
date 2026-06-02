@@ -90,7 +90,9 @@ def test_fact_sales_has_fks() -> None:
 
     required_refs = ["dimDate", "dimProduct", "dimGeography", "dimChannel"]
     for ref in required_refs:
-        assert f'REFERENCES "{ref}"' in block, f'factSales is missing REFERENCES "{ref}"'
+        assert (
+            f'REFERENCES "{ref}"' in block
+        ), f'factSales is missing REFERENCES "{ref}"'
 
 
 def test_scd2_columns_on_dim_product() -> None:
