@@ -50,6 +50,7 @@ from etl.extract import Extractor
 from etl.lineage import LineageTracker
 from etl.load import Loader
 from etl.quality import QUALITY_THRESHOLDS, DataQualityChecker
+from etl.state import get_watermark_date
 from etl.transform import Transformer
 
 # ---------------------------------------------------------------------------
@@ -146,6 +147,13 @@ def run_pipeline(since: date | None = None) -> None:
     # ------------------------------------------------------------------
     source_engine = create_engine(SOURCE_DATABASE_URL, echo=False)
     warehouse_engine = create_engine(WAREHOUSE_DATABASE_URL, echo=False)
+
+    # Resolve incremental cutoff: explicit --since overrides the watermark;
+    # no --since means auto-detect from the latest date already in the
+    # warehouse (None on first run triggers a full load).
+    if since is None:
+        since = get_watermark_date(warehouse_engine)
+        log.info("Auto-detected watermark since=%s from warehouse", since)
 
     # ------------------------------------------------------------------
     # 2. Extract
@@ -484,13 +492,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Incremental load: only process records on or after this date.",
         default=None,
     )
+    parser.add_argument(
+        "--full-reload",
+        action="store_true",
+        help="Ignore stored state and reload all records from the beginning.",
+    )
     return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
     args = _parse_args()
     since_date: date | None = None
-    if args.since:
+    if args.full_reload:
+        log.info("--full-reload flag set: ignoring stored state, loading all records")
+    elif args.since:
         try:
             since_date = date.fromisoformat(args.since)
         except ValueError:
