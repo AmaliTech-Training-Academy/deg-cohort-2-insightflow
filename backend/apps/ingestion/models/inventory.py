@@ -1,8 +1,7 @@
-from apps.core.models import TimeStampedModel
 from django.db import models
 
 
-class Store(TimeStampedModel):
+class Store(models.Model):
     storeId = models.IntegerField(primary_key=True, db_column="storeId")
     storeName = models.CharField(max_length=255, db_column="storeName")
     province = models.CharField(max_length=255, db_column="province")

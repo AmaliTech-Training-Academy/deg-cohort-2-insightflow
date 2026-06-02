@@ -21,3 +21,34 @@ class Customer(models.Model):
                 next_number = last_number + 1
                 self.customerId = f"CUST-{next_number:06d}"
         super().save(*args, **kwargs)
+
+
+class InjectionJob(models.Model):
+    class StatusChoices(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    file = models.FileField(upload_to="uploads/pos_csv/%Y/%m/%d/")
+    status = models.CharField(
+        max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING
+    )
+    total_rows = models.IntegerField(
+        null=True, blank=True, help_text="Total rows counted before processing"
+    )
+    valid_rows = models.IntegerField(default=0)
+    error_rows = models.IntegerField(default=0)
+    error_report = models.JSONField(
+        null=True, blank=True, help_text="Detailed error logs filled after processing"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "POS Upload"
+        verbose_name_plural = "POS Uploads"
+
+    def __str__(self):
+        return f"File {self.id} - {self.status}"
