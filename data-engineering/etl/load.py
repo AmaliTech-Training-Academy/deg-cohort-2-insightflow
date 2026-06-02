@@ -16,6 +16,66 @@ log = logging.getLogger("insightflow.load")
 _SOURCE_DB = "insightflow_app"
 _WAREHOUSE_DB = "insightflow_star_schema"
 
+# Static SQL for each lookup dimension — avoids dynamic string construction.
+# All identifiers are literals; no user input reaches these strings.
+_LOOKUP_SQL: dict[str, dict[str, str]] = {
+    "dimStore": {
+        "insert": (
+            'INSERT INTO "dimStore" ("storeId", "storeName", "province") '
+            "VALUES (:storeId, :storeName, :province) "
+            'ON CONFLICT ("storeId") DO NOTHING'
+        ),
+        "select": (
+            'SELECT "storeId", "storeKey" FROM "dimStore" '
+            'WHERE "storeId" = ANY(:names)'
+        ),
+    },
+    "dimGeography": {
+        "insert": (
+            'INSERT INTO "dimGeography" ("province", "country") '
+            "VALUES (:province, :country) "
+            'ON CONFLICT ("province", "country") DO NOTHING'
+        ),
+        "select": (
+            'SELECT "province", "geographyKey" FROM "dimGeography" '
+            'WHERE "province" = ANY(:names)'
+        ),
+    },
+    "dimChannel": {
+        "insert": (
+            'INSERT INTO "dimChannel" ("channelName", "channelType") '
+            "VALUES (:channelName, :channelType) "
+            'ON CONFLICT ("channelName") DO NOTHING'
+        ),
+        "select": (
+            'SELECT "channelName", "channelKey" FROM "dimChannel" '
+            'WHERE "channelName" = ANY(:names)'
+        ),
+    },
+    "dimPaymentMethod": {
+        "insert": (
+            'INSERT INTO "dimPaymentMethod" ("methodName", "methodType") '
+            "VALUES (:methodName, :methodType) "
+            'ON CONFLICT ("methodName") DO NOTHING'
+        ),
+        "select": (
+            'SELECT "methodName", "paymentMethodKey" FROM "dimPaymentMethod" '
+            'WHERE "methodName" = ANY(:names)'
+        ),
+    },
+    "dimOrderStatus": {
+        "insert": (
+            'INSERT INTO "dimOrderStatus" ("statusName") '
+            "VALUES (:statusName) "
+            'ON CONFLICT ("statusName") DO NOTHING'
+        ),
+        "select": (
+            'SELECT "statusName", "orderStatusKey" FROM "dimOrderStatus" '
+            'WHERE "statusName" = ANY(:names)'
+        ),
+    },
+}
+
 
 class Loader:
     """Write dimension and fact DataFrames to the warehouse database."""
@@ -57,7 +117,8 @@ class Loader:
         # Fetch the keys for all dates we just upserted
         result = conn.execute(
             text(
-                'SELECT "fullDate", "dateKey" FROM "dimDate" WHERE "fullDate" = ANY(:dates)'
+                'SELECT "fullDate", "dateKey" FROM "dimDate"'
+                ' WHERE "fullDate" = ANY(:dates)'
             ),
             {"dates": [r["fullDate"] for r in rows]},
         )
@@ -273,7 +334,7 @@ class Loader:
         name_col: str,
         conn: Connection,
     ) -> dict[str, int]:
-        """Generic INSERT … ON CONFLICT (name_col) DO NOTHING upsert.
+        """INSERT … ON CONFLICT DO NOTHING upsert for fixed lookup dimensions.
 
         Covers dimStore, dimGeography, dimChannel, dimPaymentMethod,
         and dimOrderStatus.
@@ -285,41 +346,14 @@ class Loader:
         if df.empty:
             return {}
 
-        _TABLE_KEY_MAP: dict[str, str] = {
-            "dimStore": "storeKey",
-            "dimGeography": "geographyKey",
-            "dimChannel": "channelKey",
-            "dimPaymentMethod": "paymentMethodKey",
-            "dimOrderStatus": "orderStatusKey",
-        }
-        if table not in _TABLE_KEY_MAP:
+        config = _LOOKUP_SQL.get(table)
+        if config is None:
             raise ValueError(f"Unknown lookup table: {table!r}")
-        pk_col = _TABLE_KEY_MAP[table]
 
-        # Build quoted column list from df (column names are set by our own
-        # transform layer — not derived from user input)
-        cols = list(df.columns)
-        col_list = ", ".join(f'"{c}"' for c in cols)
-        bind_list = ", ".join(f":{c}" for c in cols)
+        conn.execute(text(config["insert"]), df.to_dict(orient="records"))
 
-        conn.execute(  # nosec B608 — table/col names come from internal whitelist
-            text(
-                f'INSERT INTO "{table}" ({col_list}) '
-                f'VALUES ({bind_list}) '
-                f'ON CONFLICT ("{name_col}") DO NOTHING'
-            ),
-            df.to_dict(orient="records"),
-        )
-
-        # Fetch keys
         names = df[name_col].tolist()
-        result = conn.execute(  # nosec B608 — table/col names come from internal whitelist
-            text(
-                f'SELECT "{name_col}", "{pk_col}" FROM "{table}"'
-                f' WHERE "{name_col}" = ANY(:names)'
-            ),
-            {"names": names},
-        )
+        result = conn.execute(text(config["select"]), {"names": names})
         mapping: dict[str, int] = {row[0]: row[1] for row in result}
         log.info("upsert_dim_lookup(%s): %d rows processed", table, len(mapping))
         return mapping
