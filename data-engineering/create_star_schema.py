@@ -88,5 +88,7 @@ def create_schema(database_url: str = WAREHOUSE_DATABASE_URL) -> None:
             log.error("Schema creation failed: %s", exc)
             engine.dispose()
             sys.exit(1)
+
+
 if __name__ == "__main__":
     create_schema()
