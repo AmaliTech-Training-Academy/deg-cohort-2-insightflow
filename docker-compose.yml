@@ -46,6 +46,7 @@ services:
       retries: 5
 
   backend:
+    image: insightflow-backend:${DEPLOY_TAG:-local}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -73,6 +74,7 @@ services:
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
   etl:
+    image: insightflow-etl:${DEPLOY_TAG:-local}
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
