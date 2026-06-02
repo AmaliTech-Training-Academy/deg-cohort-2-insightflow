@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (git-ignored) and fill in real values.
+# Never commit terraform.tfvars — it contains secrets.
+# In CI, pass values as TF_VAR_app_db_password etc. via GitHub Secrets.
+
+region                = "eu-west-1"
+app_db_password       = "change-me-strong-password"
+warehouse_db_password = "change-me-strong-password"
