@@ -64,6 +64,12 @@ variable "enable_performance_insights" {
   default     = false
 }
 
+variable "monitoring_interval" {
+  description = "Enhanced monitoring interval in seconds. 0 disables it (dev). 60 for prod."
+  type        = number
+  default     = 0
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

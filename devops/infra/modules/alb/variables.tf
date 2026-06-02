@@ -32,6 +32,12 @@ variable "acm_certificate_arn" {
   default     = ""
 }
 
+variable "enable_deletion_protection" {
+  description = "Prevent the ALB from being deleted via the API. Enable in prod."
+  type        = bool
+  default     = false
+}
+
 variable "enable_waf" {
   description = "Attach WAF v2 with AWS managed rules. Only enable in prod."
   type        = bool

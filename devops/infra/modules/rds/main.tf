@@ -17,6 +17,29 @@ resource "aws_db_parameter_group" "postgres16" {
   tags   = var.tags
 }
 
+# IAM role for enhanced monitoring — only created when monitoring_interval > 0
+resource "aws_iam_role" "rds_monitoring" {
+  count = var.monitoring_interval > 0 ? 1 : 0
+  name  = "${var.name}-rds-monitoring"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "monitoring.rds.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring" {
+  count      = var.monitoring_interval > 0 ? 1 : 0
+  role       = aws_iam_role.rds_monitoring[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
 # App DB — OLTP (Django backend)
 resource "aws_db_instance" "app" {
   identifier        = "${var.name}-app-db"
@@ -41,7 +64,14 @@ resource "aws_db_instance" "app" {
   deletion_protection     = var.deletion_protection
   backup_retention_period = var.backup_retention_days
 
+  auto_minor_version_upgrade          = true
+  copy_tags_to_snapshot               = true
+  iam_database_authentication_enabled = true
+  enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
+
   performance_insights_enabled = var.enable_performance_insights
+  monitoring_interval          = var.monitoring_interval
+  monitoring_role_arn          = var.monitoring_interval > 0 ? aws_iam_role.rds_monitoring[0].arn : null
 
   tags = merge(var.tags, { Name = "${var.name}-app-db" })
 }
@@ -70,7 +100,14 @@ resource "aws_db_instance" "warehouse" {
   deletion_protection     = var.deletion_protection
   backup_retention_period = var.backup_retention_days
 
+  auto_minor_version_upgrade          = true
+  copy_tags_to_snapshot               = true
+  iam_database_authentication_enabled = true
+  enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
+
   performance_insights_enabled = var.enable_performance_insights
+  monitoring_interval          = var.monitoring_interval
+  monitoring_role_arn          = var.monitoring_interval > 0 ? aws_iam_role.rds_monitoring[0].arn : null
 
   tags = merge(var.tags, { Name = "${var.name}-warehouse-db" })
 }

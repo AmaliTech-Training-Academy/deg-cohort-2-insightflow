@@ -74,6 +74,7 @@ resource "aws_security_group" "ec2" {
   }
 
   egress {
+    description = "All outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -98,6 +99,7 @@ resource "aws_security_group" "rds" {
   }
 
   egress {
+    description = "All outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -122,6 +124,7 @@ resource "aws_security_group" "redis" {
   }
 
   egress {
+    description = "All outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

@@ -97,6 +97,8 @@ resource "aws_instance" "this" {
   vpc_security_group_ids = [var.security_group_id]
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
   key_name               = var.key_name
+  ebs_optimized          = true
+  monitoring             = true
 
   # Dev: public IP enables SSH. Prod: no public IP — access via SSM through NAT GW.
   associate_public_ip_address = var.enable_public_ip

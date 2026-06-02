@@ -11,6 +11,9 @@ resource "aws_lb" "this" {
   security_groups    = [var.alb_security_group_id]
   subnets            = var.public_subnet_ids
 
+  drop_invalid_header_fields = true
+  enable_deletion_protection = var.enable_deletion_protection
+
   # Access logs are optional — enable by setting var.access_logs_bucket
   dynamic "access_logs" {
     for_each = var.access_logs_bucket != "" ? [1] : []
@@ -174,9 +177,29 @@ resource "aws_wafv2_web_acl" "this" {
     }
   }
 
+  # Blocks Log4Shell (CVE-2021-44228) and other known-bad inputs
+  rule {
+    name     = "AWSManagedRulesKnownBadInputsRuleSet"
+    priority = 2
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name}-known-bad-inputs"
+      sampled_requests_enabled   = true
+    }
+  }
+
   rule {
     name     = "RateLimit"
-    priority = 2
+    priority = 3
     action {
       block {}
     }
@@ -206,4 +229,18 @@ resource "aws_wafv2_web_acl_association" "alb" {
   count        = var.enable_waf ? 1 : 0
   resource_arn = aws_lb.this.arn
   web_acl_arn  = aws_wafv2_web_acl.this[0].arn
+}
+
+# WAF access logs — name must start with aws-waf-logs-
+resource "aws_cloudwatch_log_group" "waf" {
+  count             = var.enable_waf ? 1 : 0
+  name              = "aws-waf-logs-${var.name}"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+resource "aws_wafv2_web_acl_logging_configuration" "this" {
+  count                   = var.enable_waf ? 1 : 0
+  log_destination_configs = [aws_cloudwatch_log_group.waf[0].arn]
+  resource_arn            = aws_wafv2_web_acl.this[0].arn
 }

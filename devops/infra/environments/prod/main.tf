@@ -102,26 +102,28 @@ module "rds" {
   app_db_password       = var.app_db_password
   warehouse_db_password = var.warehouse_db_password
 
-  # Prod: deletion protection on, 7-day backups
+  # Prod: deletion protection on, 7-day backups, enhanced monitoring
   multi_az                    = false
   skip_final_snapshot         = false
   deletion_protection         = true
   backup_retention_days       = 7
   enable_performance_insights = true
+  monitoring_interval         = 60
 
   tags = local.common_tags
 }
 
 # ── ALB + WAF ─────────────────────────────────────────────────────────────────
 module "alb" {
-  source                = "../../modules/alb"
-  name                  = local.name
-  vpc_id                = module.vpc.vpc_id
-  public_subnet_ids     = module.vpc.public_subnet_ids
-  alb_security_group_id = module.security_groups.alb_sg_id
-  ec2_instance_id       = module.ec2.instance_id
-  enable_https          = true # enforce TLS in prod
-  acm_certificate_arn   = var.acm_certificate_arn
-  enable_waf            = true
-  tags                  = local.common_tags
+  source                     = "../../modules/alb"
+  name                       = local.name
+  vpc_id                     = module.vpc.vpc_id
+  public_subnet_ids          = module.vpc.public_subnet_ids
+  alb_security_group_id      = module.security_groups.alb_sg_id
+  ec2_instance_id            = module.ec2.instance_id
+  enable_https               = true # enforce TLS in prod
+  enable_deletion_protection = true # prevent accidental ALB deletion in prod
+  acm_certificate_arn        = var.acm_certificate_arn
+  enable_waf                 = true
+  tags                       = local.common_tags
 }
