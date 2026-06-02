@@ -1,8 +1,7 @@
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
-
 from apps.ingestion.models.inventory import InventoryStagingRecord
 from apps.ingestion.serializers.inventory import InventoryStagingRecordSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 
 
 class InventoryStagingListCreateView(generics.ListCreateAPIView):

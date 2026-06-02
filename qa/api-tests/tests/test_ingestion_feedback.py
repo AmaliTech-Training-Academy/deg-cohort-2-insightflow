@@ -62,7 +62,7 @@ class TestFeedbackIngestion:
         assert resp.json()["id"] == record_id
 
     def test_rating_out_of_range(self, base_url, auth_headers, ingestion_job_id):
-        """Ratings outside 1-5 should be rejected. TODO: wire validator to serializer."""
+        """Ratings outside 1-5 rejected. TODO: wire validator to serializer."""
         # TODO: implement rating range validation in FeedbackStagingRecordSerializer
         pass
 

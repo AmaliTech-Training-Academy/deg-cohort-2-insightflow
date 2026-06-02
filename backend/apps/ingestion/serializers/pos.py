@@ -1,6 +1,5 @@
-from rest_framework import serializers
-
 from apps.ingestion.models.pos import POSStagingRecord
+from rest_framework import serializers
 
 
 class POSStagingRecordSerializer(serializers.ModelSerializer):

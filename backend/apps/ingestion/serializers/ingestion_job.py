@@ -1,12 +1,9 @@
-from rest_framework import serializers
-
 from apps.ingestion.models.base import IngestionJob
+from rest_framework import serializers
 
 
 class IngestionJobSerializer(serializers.ModelSerializer):
-    created_by_email = serializers.CharField(
-        source="created_by.email", read_only=True
-    )
+    created_by_email = serializers.CharField(source="created_by.email", read_only=True)
 
     class Meta:
         model = IngestionJob

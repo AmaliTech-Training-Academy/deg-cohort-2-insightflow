@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 
 def validate_pos_row(row: dict) -> dict:
-    """Validate a single POS data row. Returns cleaned data or raises ValidationError."""
+    """Validate POS data row and return cleaned data or raise ValidationError."""
     errors = {}
 
     if not row.get("transaction_id"):

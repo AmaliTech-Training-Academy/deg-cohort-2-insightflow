@@ -1,8 +1,7 @@
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
-
 from apps.ingestion.models.feedback import FeedbackStagingRecord
 from apps.ingestion.serializers.feedback import FeedbackStagingRecordSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 
 
 class FeedbackStagingListCreateView(generics.ListCreateAPIView):

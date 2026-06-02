@@ -1,6 +1,5 @@
-from rest_framework import serializers
-
 from apps.ingestion.models.online_orders import OnlineOrderStagingRecord
+from rest_framework import serializers
 
 
 class OnlineOrderStagingRecordSerializer(serializers.ModelSerializer):

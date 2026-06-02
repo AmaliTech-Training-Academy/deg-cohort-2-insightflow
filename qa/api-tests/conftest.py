@@ -23,6 +23,7 @@ COMPOSE_FILE = PROJECT_ROOT / "docker-compose.yml"
 # Server lifecycle
 # ---------------------------------------------------------------------------
 
+
 def _port_open(host: str, port: int) -> bool:
     try:
         with socket.create_connection((host, port), timeout=2):
@@ -32,12 +33,12 @@ def _port_open(host: str, port: int) -> bool:
 
 
 def _docker_compose(*args: str) -> subprocess.CompletedProcess:
-    """Run a docker compose command, trying both 'docker compose' and 'docker-compose'."""
+    """Run docker compose command, trying 'docker compose' then 'docker-compose'."""
     base_cmd = ["-f", str(COMPOSE_FILE)]
     for cmd in (["docker", "compose"], ["docker-compose"]):
         try:
             return subprocess.run(
-                cmd + base_cmd + list(args),
+                cmd + base_cmd + list(args),  # type: ignore[return-value]
                 check=True,
                 capture_output=True,
                 text=True,
@@ -104,6 +105,7 @@ def django_server():
 # ---------------------------------------------------------------------------
 # Common fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def base_url():

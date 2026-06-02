@@ -1,5 +1,3 @@
-from django.urls import path
-
 from apps.ingestion.views.feedback import (
     FeedbackStagingDetailView,
     FeedbackStagingListCreateView,
@@ -17,10 +15,13 @@ from apps.ingestion.views.online_orders import (
     OnlineOrderStagingListCreateView,
 )
 from apps.ingestion.views.pos import POSStagingDetailView, POSStagingListCreateView
+from django.urls import path
 
 urlpatterns = [
     path("jobs/", IngestionJobListCreateView.as_view(), name="ingestion-job-list"),
-    path("jobs/<int:pk>/", IngestionJobDetailView.as_view(), name="ingestion-job-detail"),
+    path(
+        "jobs/<int:pk>/", IngestionJobDetailView.as_view(), name="ingestion-job-detail"
+    ),
     path("pos/", POSStagingListCreateView.as_view(), name="ingestion-pos-list"),
     path("pos/<int:pk>/", POSStagingDetailView.as_view(), name="ingestion-pos-detail"),
     path(

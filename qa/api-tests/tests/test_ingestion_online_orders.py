@@ -24,7 +24,7 @@ class TestOnlineOrdersIngestion:
         assert resp.status_code == 401
 
     def test_create_online_order_record(self, base_url, auth_headers, ingestion_job_id):
-        """POST /api/ingestion/online-orders/ creates a staging record and returns 201."""
+        """Create online order record via POST and return 201."""
         payload = {
             "job": ingestion_job_id,
             "order_id": "ORD-001",

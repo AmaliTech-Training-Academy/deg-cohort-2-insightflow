@@ -12,7 +12,9 @@ import requests
 class TestInventoryIngestion:
     def test_list_inventory_authenticated(self, base_url, auth_headers):
         """GET /api/ingestion/inventory/ returns 200 and a paginated list."""
-        resp = requests.get(f"{base_url}/api/ingestion/inventory/", headers=auth_headers)
+        resp = requests.get(
+            f"{base_url}/api/ingestion/inventory/", headers=auth_headers
+        )
         assert resp.status_code == 200
         # TODO: assert resp.json() has expected pagination shape
 
@@ -66,7 +68,7 @@ class TestInventoryIngestion:
         assert resp.json()["id"] == record_id
 
     def test_negative_quantity_rejected(self, base_url, auth_headers, ingestion_job_id):
-        """Negative quantities should be rejected. TODO: wire validator to serializer."""
+        """Reject negative quantities. TODO: wire validator to serializer."""
         # TODO: implement quantity >= 0 validation in InventoryStagingRecordSerializer
         pass
 

@@ -1,8 +1,7 @@
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
-
 from apps.ingestion.models.pos import POSStagingRecord
 from apps.ingestion.serializers.pos import POSStagingRecordSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 
 
 class POSStagingListCreateView(generics.ListCreateAPIView):

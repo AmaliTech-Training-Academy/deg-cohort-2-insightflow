@@ -1,6 +1,5 @@
-from rest_framework import serializers
-
 from apps.ingestion.models.inventory import InventoryStagingRecord
+from rest_framework import serializers
 
 
 class InventoryStagingRecordSerializer(serializers.ModelSerializer):

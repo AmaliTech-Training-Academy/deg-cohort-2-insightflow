@@ -1,10 +1,9 @@
-from django.contrib import admin
-
 from apps.ingestion.models.base import IngestionJob
 from apps.ingestion.models.feedback import FeedbackStagingRecord
 from apps.ingestion.models.inventory import InventoryStagingRecord
 from apps.ingestion.models.online_orders import OnlineOrderStagingRecord
 from apps.ingestion.models.pos import POSStagingRecord
+from django.contrib import admin
 
 
 @admin.register(IngestionJob)
@@ -16,7 +15,13 @@ class IngestionJobAdmin(admin.ModelAdmin):
 
 @admin.register(POSStagingRecord)
 class POSStagingAdmin(admin.ModelAdmin):
-    list_display = ("transaction_id", "store_id", "amount", "transaction_date", "status")
+    list_display = (
+        "transaction_id",
+        "store_id",
+        "amount",
+        "transaction_date",
+        "status",
+    )
     list_filter = ("status",)
 
 

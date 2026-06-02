@@ -1,8 +1,7 @@
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
-
 from apps.ingestion.models.base import IngestionJob
 from apps.ingestion.serializers.ingestion_job import IngestionJobSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 
 
 class IngestionJobListCreateView(generics.ListCreateAPIView):

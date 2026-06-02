@@ -1,8 +1,7 @@
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
-
 from apps.ingestion.models.online_orders import OnlineOrderStagingRecord
 from apps.ingestion.serializers.online_orders import OnlineOrderStagingRecordSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 
 
 class OnlineOrderStagingListCreateView(generics.ListCreateAPIView):
