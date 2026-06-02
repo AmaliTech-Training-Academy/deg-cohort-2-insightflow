@@ -1,9 +1,9 @@
 terraform {
   required_version = ">= 1.6"
   required_providers {
-    aws   = { source = "hashicorp/aws",       version = "~> 5.0" }
-    tls   = { source = "hashicorp/tls",       version = "~> 4.0" }
-    local = { source = "hashicorp/local",     version = "~> 2.0" }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
+    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
+    local = { source = "hashicorp/local", version = "~> 2.0" }
   }
 
   # Uncomment after creating the S3 bucket + DynamoDB table (see bootstrap/)
@@ -24,8 +24,8 @@ provider "aws" {
 }
 
 locals {
-  name            = "insightflow-dev"
-  ssh_key_path    = pathexpand("~/.ssh/insightflow-dev.pem")
+  name         = "insightflow-dev"
+  ssh_key_path = pathexpand("~/.ssh/insightflow-dev.pem")
   common_tags = {
     Project     = "InsightFlow"
     Environment = "dev"
@@ -83,7 +83,7 @@ module "security_groups" {
   name            = local.name
   vpc_id          = module.vpc.vpc_id
   enable_alb      = true
-  enable_ssh      = true           # dev only — never enable in prod
+  enable_ssh      = true          # dev only — never enable in prod
   ssh_cidr_blocks = ["0.0.0.0/0"] # restrict to your IP for extra safety
   tags            = local.common_tags
 }

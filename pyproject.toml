@@ -18,7 +18,7 @@ python_version = "3.11"
 ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
-exclude = ["migrations/", "\\.venv/", "venv/"]
+exclude = ["migrations/", "\\.venv/", "venv/", "qa/infra-tests/"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "qa"]

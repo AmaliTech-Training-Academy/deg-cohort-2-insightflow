@@ -21,7 +21,8 @@ class TestProdSecurity:
 
     def test_ssh_explicitly_disabled(self, prod):
         assert has_setting(prod, "enable_ssh", "false"), (
-            "Prod must set enable_ssh = false — port 22 must never be open in production"
+            "Prod must set enable_ssh = false"
+            " — port 22 must never be open in production"
         )
 
     def test_ssh_never_enabled(self, prod):
@@ -46,7 +47,8 @@ class TestProdSecurity:
 
     def test_rds_deletion_protection(self, prod):
         assert has_setting(prod, "deletion_protection", "true"), (
-            "Prod RDS must have deletion_protection = true to prevent accidental data loss"
+            "Prod RDS must have deletion_protection = true"
+            " to prevent accidental data loss"
         )
 
     def test_rds_backup_retention(self, prod):
@@ -99,7 +101,8 @@ class TestDevAccess:
 
     def test_no_deletion_protection_in_dev(self, dev):
         assert has_setting(dev, "deletion_protection", "false"), (
-            "Dev RDS must not have deletion protection — allows fast teardown with terraform destroy"
+            "Dev RDS must not have deletion protection"
+            " — allows fast teardown with terraform destroy"
         )
 
     def test_skip_final_snapshot_in_dev(self, dev):
@@ -176,7 +179,8 @@ class TestVPCModule:
 
     def test_dns_hostnames_enabled(self, vpc_main):
         assert "enable_dns_hostnames = true" in vpc_main, (
-            "VPC must have DNS hostnames enabled — required for SSM and RDS endpoint resolution"
+            "VPC must have DNS hostnames enabled"
+            " — required for SSM and RDS endpoint resolution"
         )
 
     def test_dns_support_enabled(self, vpc_main):

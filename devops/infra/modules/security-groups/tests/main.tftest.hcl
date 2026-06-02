@@ -77,12 +77,12 @@ run "rds_only_reachable_from_ec2" {
   }
 
   assert {
-    condition     = aws_security_group.rds.ingress[0].from_port == 5432
+    condition     = alltrue([for r in aws_security_group.rds.ingress : r.from_port == 5432])
     error_message = "RDS SG ingress must only allow port 5432"
   }
 
   assert {
-    condition     = length(aws_security_group.rds.ingress[0].cidr_blocks) == 0
+    condition     = alltrue([for r in aws_security_group.rds.ingress : length(r.cidr_blocks) == 0])
     error_message = "RDS SG must not have any CIDR-based ingress (SG-to-SG only)"
   }
 }

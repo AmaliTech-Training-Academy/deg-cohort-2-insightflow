@@ -59,7 +59,7 @@ module "security_groups" {
   name       = local.name
   vpc_id     = module.vpc.vpc_id
   enable_alb = true
-  enable_ssh = false   # no SSH in prod — use SSM Session Manager
+  enable_ssh = false # no SSH in prod — use SSM Session Manager
   tags       = local.common_tags
 }
 
@@ -72,7 +72,7 @@ module "ec2" {
   security_group_id  = module.security_groups.ec2_sg_id
   instance_type      = "t3.medium"
   root_volume_gb     = 30
-  enable_public_ip   = false   # prod: SSM-only access through NAT GW
+  enable_public_ip   = false # prod: SSM-only access through NAT GW
   s3_bucket_name     = module.s3.bucket_name
   log_retention_days = 30
   tags               = local.common_tags
@@ -85,9 +85,9 @@ module "redis" {
   private_subnet_ids      = module.vpc.private_subnet_ids
   redis_security_group_id = module.security_groups.redis_sg_id
   node_type               = "cache.t3.small"
-  transit_encryption_mode = "required"   # enforce TLS in prod
-  snapshot_retention_days = 1            # daily snapshot for prod
-  apply_immediately       = false        # wait for maintenance window in prod
+  transit_encryption_mode = "required" # enforce TLS in prod
+  snapshot_retention_days = 1          # daily snapshot for prod
+  apply_immediately       = false      # wait for maintenance window in prod
   tags                    = local.common_tags
 }
 
@@ -120,7 +120,7 @@ module "alb" {
   public_subnet_ids     = module.vpc.public_subnet_ids
   alb_security_group_id = module.security_groups.alb_sg_id
   ec2_instance_id       = module.ec2.instance_id
-  enable_https          = true                      # enforce TLS in prod
+  enable_https          = true # enforce TLS in prod
   acm_certificate_arn   = var.acm_certificate_arn
   enable_waf            = true
   tags                  = local.common_tags

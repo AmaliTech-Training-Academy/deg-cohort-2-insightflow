@@ -32,7 +32,7 @@ resource "aws_elasticache_replication_group" "this" {
   description          = "InsightFlow Redis - ${var.name}"
 
   node_type            = var.node_type
-  num_cache_clusters   = 1          # single primary, no replica (cost-optimised)
+  num_cache_clusters   = 1 # single primary, no replica (cost-optimised)
   port                 = 6379
   parameter_group_name = aws_elasticache_parameter_group.this.name
   subnet_group_name    = aws_elasticache_subnet_group.this.name

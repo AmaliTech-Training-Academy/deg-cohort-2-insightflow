@@ -37,7 +37,8 @@ pytestmark = pytest.mark.skipif(
 def test_terraform_fmt_check():
     result = tf(["fmt", "-check", "-recursive", "devops/infra/"], cwd=REPO_ROOT)
     assert result.returncode == 0, (
-        f"terraform fmt -check failed — run `terraform fmt -recursive devops/infra/` to fix:\n"
+        "terraform fmt -check failed — "
+        "run `terraform fmt -recursive devops/infra/` to fix:\n"
         f"{result.stdout}"
     )
 
@@ -80,7 +81,9 @@ def test_prod_environment_validates(init_prod):
 def init_sg_module():
     module_dir = os.path.join(INFRA_ROOT, "modules", "security-groups")
     result = tf(["init", "-no-color"], cwd=module_dir)
-    assert result.returncode == 0, f"terraform init failed for security-groups:\n{result.stderr}"
+    assert result.returncode == 0, (
+        f"terraform init failed for security-groups:\n{result.stderr}"
+    )
     return module_dir
 
 
@@ -95,7 +98,8 @@ def init_vpc_module():
 def test_security_groups_module_tests_pass(init_sg_module):
     result = tf(["test", "-no-color"], cwd=init_sg_module)
     assert result.returncode == 0, (
-        f"terraform test failed for security-groups module:\n{result.stdout}\n{result.stderr}"
+        f"terraform test failed for security-groups module:\n"
+        f"{result.stdout}\n{result.stderr}"
     )
 
 

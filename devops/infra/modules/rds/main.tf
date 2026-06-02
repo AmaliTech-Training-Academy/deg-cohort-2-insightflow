@@ -35,10 +35,10 @@ resource "aws_db_instance" "app" {
   vpc_security_group_ids = [var.rds_security_group_id]
   parameter_group_name   = aws_db_parameter_group.postgres16.name
 
-  multi_az               = var.multi_az
-  publicly_accessible    = false
-  skip_final_snapshot    = var.skip_final_snapshot
-  deletion_protection    = var.deletion_protection
+  multi_az                = var.multi_az
+  publicly_accessible     = false
+  skip_final_snapshot     = var.skip_final_snapshot
+  deletion_protection     = var.deletion_protection
   backup_retention_period = var.backup_retention_days
 
   performance_insights_enabled = var.enable_performance_insights
@@ -64,10 +64,10 @@ resource "aws_db_instance" "warehouse" {
   vpc_security_group_ids = [var.rds_security_group_id]
   parameter_group_name   = aws_db_parameter_group.postgres16.name
 
-  multi_az               = var.multi_az
-  publicly_accessible    = false
-  skip_final_snapshot    = var.skip_final_snapshot
-  deletion_protection    = var.deletion_protection
+  multi_az                = var.multi_az
+  publicly_accessible     = false
+  skip_final_snapshot     = var.skip_final_snapshot
+  deletion_protection     = var.deletion_protection
   backup_retention_period = var.backup_retention_days
 
   performance_insights_enabled = var.enable_performance_insights
