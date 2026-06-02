@@ -23,3 +23,9 @@ exclude = ["migrations/", "\\.venv/", "venv/"]
 [tool.bandit]
 exclude_dirs = ["tests", "qa"]
 skips = ["B101"]  # allow assert in non-test code
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "insightflow.settings"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
