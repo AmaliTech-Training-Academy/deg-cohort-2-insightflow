@@ -1,7 +1,7 @@
 import os
 import re
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 INFRA_ROOT = os.path.join(REPO_ROOT, "devops", "infra")
 
 

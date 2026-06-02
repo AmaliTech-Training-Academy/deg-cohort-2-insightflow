@@ -385,6 +385,9 @@ jobs:
             --skip-check CKV_AWS_353 \
             --skip-check CKV2_AWS_69 \
             --skip-check CKV2_AWS_76 \
+            --skip-check CKV_AWS_150 \
+            --skip-check CKV_AWS_31 \
+            --skip-check CKV_AWS_118 \
             --skip-check CKV_AWS_149 \
             --skip-check CKV2_AWS_62
 

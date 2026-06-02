@@ -12,10 +12,11 @@ import pytest
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 INFRA_ROOT = os.path.join(REPO_ROOT, "devops", "infra")
 
-terraform = shutil.which("terraform")
+terraform: str | None = shutil.which("terraform")
 
 
 def tf(args: list[str], cwd: str) -> subprocess.CompletedProcess:
+    assert terraform is not None  # guarded by pytestmark skipif above
     return subprocess.run(
         [terraform, *args],
         cwd=cwd,
