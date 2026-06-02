@@ -9,7 +9,11 @@ Rules enforced:
 """
 
 import pytest
-from conftest import read_env, read_module, has_setting
+import sys
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from helpers import has_setting, read_env, read_module
 
 
 # ── Production security rules ─────────────────────────────────────────────────

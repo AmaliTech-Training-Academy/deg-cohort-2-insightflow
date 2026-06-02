@@ -82,7 +82,7 @@ run "rds_only_reachable_from_ec2" {
   }
 
   assert {
-    condition     = alltrue([for r in aws_security_group.rds.ingress : length(r.cidr_blocks) == 0])
+    condition     = alltrue([for r in aws_security_group.rds.ingress : length(coalesce(r.cidr_blocks, [])) == 0])
     error_message = "RDS SG must not have any CIDR-based ingress (SG-to-SG only)"
   }
 }
