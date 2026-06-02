@@ -3,7 +3,7 @@ from django.db import models
 
 
 class User(AbstractUser):
-    userId = models.BigAutoField(primary_key=True, db_column="userId", default=None)
+    id = models.BigAutoField(primary_key=True, db_column="userId", default=None)
     role = models.CharField(max_length=255, db_column="role", blank=True, null=True)
 
     class Meta:
@@ -11,6 +11,6 @@ class User(AbstractUser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._meta.get_field("username").db_column = "userName"
+        self._meta.get_field("username").db_column = "username"
         self._meta.get_field("email").db_column = "email"
-        self._meta.get_field("is_active").db_column = "isActive"
+        self._meta.get_field("is_active").db_column = "is_active"
