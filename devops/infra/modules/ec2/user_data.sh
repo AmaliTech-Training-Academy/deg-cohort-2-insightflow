@@ -1,0 +1,38 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install Docker
+dnf install -y docker
+systemctl enable --now docker
+
+# Docker Compose v2 plugin
+COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest \
+  | grep '"tag_name"' | cut -d'"' -f4)
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -SL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Allow ec2-user to run Docker without sudo
+usermod -aG docker ec2-user
+
+# App working directory
+mkdir -p /opt/insightflow
+chown ec2-user:ec2-user /opt/insightflow
+
+# Authenticate Docker with ECR on boot (refreshed by cron every 11h)
+cat > /usr/local/bin/ecr-login.sh <<'EOF'
+#!/bin/bash
+REGION="${region}"
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin \
+    "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
+EOF
+chmod +x /usr/local/bin/ecr-login.sh
+/usr/local/bin/ecr-login.sh || true
+
+echo "0 */11 * * * root /usr/local/bin/ecr-login.sh" > /etc/cron.d/ecr-login
+
+# Log marker — visible in EC2 System Log
+echo "InsightFlow (${name}) bootstrap complete"

@@ -32,6 +32,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: insightflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -40,7 +53,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DJANGO_SETTINGS_MODULE: insightflow.settings
+      DJANGO_SETTINGS_MODULE: insightflow.settings.prod
       DJANGO_SECRET_KEY: change-me-in-production-use-a-long-random-string
       DEBUG: "False"
       DB_HOST: postgres-app
@@ -48,8 +61,11 @@ services:
       DB_NAME: insightflow_app
       DB_USER: insightflow
       DB_PASSWORD: insightflow_pass
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres-app:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: >
       sh -c "python manage.py migrate &&
@@ -67,8 +83,11 @@ services:
       DB_NAME: insightflow_warehouse
       DB_USER: insightflow_wh
       DB_PASSWORD: insightflow_wh_pass
+      REDIS_URL: redis://redis:6379/1
     depends_on:
       postgres-warehouse:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: >
       sh -c "python sample_data.py &&
@@ -78,3 +97,4 @@ services:
 volumes:
   pgdata-app:
   pgdata-warehouse:
+  redis-data:
