@@ -74,6 +74,49 @@ def test_build_dim_customer_sets_scd_fields(
 
 
 # ---------------------------------------------------------------------------
+# dimGeography
+# ---------------------------------------------------------------------------
+
+
+def test_build_dim_geography_default_country_rwanda(
+    transformer: Transformer,
+) -> None:
+    """When the source DataFrame has no country column the default must be Rwanda."""
+    df = pd.DataFrame({"province": ["Kigali", "Eastern"]})
+    geo = transformer.build_dim_geography(df)
+    assert (
+        geo["country"] == "Rwanda"
+    ).all(), "Default country must be Rwanda when no country column is present"
+
+
+# ---------------------------------------------------------------------------
+# dimCustomer — customerId type
+# ---------------------------------------------------------------------------
+
+
+def test_build_dim_customer_preserves_string_customer_id(
+    transformer: Transformer,
+) -> None:
+    """build_dim_customer must keep customerId as a string.
+
+    The OLTP customer.customerId is character varying, so we must not cast
+    it to int anywhere in the transform layer.
+    """
+    df = pd.DataFrame(
+        {
+            "customerId": ["CUS-001", "CUS-002"],
+            "fullName": ["Alice", "Bob"],
+            "email": ["a@example.com", "b@example.com"],
+        }
+    )
+    result = transformer.build_dim_customer(df)
+    assert (
+        result["customerId"].dtype == object
+    ), "customerId must remain a string (object) dtype"
+    assert list(result["customerId"]) == ["CUS-001", "CUS-002"]
+
+
+# ---------------------------------------------------------------------------
 # cleanse_sales
 # ---------------------------------------------------------------------------
 
