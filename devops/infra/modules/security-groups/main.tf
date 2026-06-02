@@ -40,7 +40,7 @@ resource "aws_security_group" "alb" {
 # EC2 — inbound from ALB; SSH only if explicitly enabled (dev/testing only)
 resource "aws_security_group" "ec2" {
   name        = "${var.name}-sg-ec2"
-  description = "EC2: inbound from ALB${var.enable_ssh ? ", SSH for dev/testing" : " only — no port 22"}"
+  description = "EC2: inbound from ALB${var.enable_ssh ? ", SSH for dev/testing" : " only - no port 22"}"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -65,7 +65,7 @@ resource "aws_security_group" "ec2" {
   dynamic "ingress" {
     for_each = var.enable_ssh ? [1] : []
     content {
-      description = "SSH — dev/testing only"
+      description = "SSH - dev/testing only"
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
