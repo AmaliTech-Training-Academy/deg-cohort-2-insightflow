@@ -21,7 +21,8 @@ import argparse
 import logging
 import sys
 import uuid
-from datetime import date, datetime
+from collections.abc import Callable
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -82,24 +83,20 @@ def _run_quality_checks(
 
     Returns the quality summary dict.
     """
-    checks = [
+    checks: list[tuple[str, Callable[[pd.DataFrame], pd.Series]]] = [
         ("null_keys", lambda d: checker.check_null_keys(d, key_cols)),
         ("positive_quantities", checker.check_positive_quantities),
         ("positive_prices", checker.check_positive_prices),
     ]
     if date_col:
+        _dc = date_col  # narrowed to str; captured so lambda stays single-arg
         checks.append(
-            (
-                "date_not_future",
-                lambda d, _dc=date_col: checker.check_date_not_future(d, _dc),
-            )
+            ("date_not_future", lambda d: checker.check_date_not_future(d, _dc))
         )
     if discount_col:
+        _disc = discount_col  # narrowed to str; captured so lambda stays single-arg
         checks.append(
-            (
-                "discount_range",
-                lambda d, _dc=discount_col: checker.check_discount_range(d, _dc),
-            )
+            ("discount_range", lambda d: checker.check_discount_range(d, _disc))
         )
 
     _, summary = checker.score_dataframe(df, table_name, checks)
@@ -458,7 +455,7 @@ def run_pipeline(since: date | None = None) -> None:
     log.info(
         "Pipeline complete  run_id=%s  finished=%s",
         run_id,
-        datetime.utcnow().isoformat(),
+        datetime.now(timezone.utc).isoformat(),
     )
     log.info("Rows loaded per table:")
     for tbl, cnt in rows_loaded.items():
