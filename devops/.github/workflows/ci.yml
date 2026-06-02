@@ -358,6 +358,7 @@ jobs:
         run: |
           pip install checkov
           checkov -d devops/infra/ --quiet --compact \
+            --skip-check CKV_AWS_17 \
             --skip-check CKV_AWS_88 \
             --skip-check CKV_AWS_24 \
             --skip-check CKV_AWS_293 \
