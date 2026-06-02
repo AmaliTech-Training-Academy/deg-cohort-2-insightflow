@@ -23,9 +23,10 @@ services:
       POSTGRES_DB: insightflow_warehouse
       POSTGRES_USER: insightflow_wh
       POSTGRES_PASSWORD: insightflow_wh_pass
+    ports:
+      - "5433:5432"
     volumes:
       - pgdata-warehouse:/var/lib/postgresql/data
-      - ./data-engineering/warehouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U insightflow_wh -d insightflow_warehouse"]
       interval: 10s
@@ -51,29 +52,49 @@ services:
     depends_on:
       postgres-app:
         condition: service_healthy
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py seed_data &&
-             gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
-  etl:
+  # ── One-shot init container: creates the star-schema DDL then exits ──────────
+  schema-init:
+    build:
+      context: ./data-engineering
+      dockerfile: Dockerfile
+    container_name: insightflow-schema-init
+    environment:
+      WAREHOUSE_DB_HOST: postgres-warehouse
+      WAREHOUSE_DB_PORT: "5432"
+      WAREHOUSE_DB_NAME: insightflow_warehouse
+      WAREHOUSE_DB_USER: insightflow_wh
+      WAREHOUSE_DB_PASSWORD: insightflow_wh_pass
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+    command: python create_star_schema.py
+    restart: "no"
+
+  # ── ETL pipeline: runs after schema is ready; exits 0 when done ──────────────
+  etl-pipeline:
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl
     environment:
-      DB_HOST: postgres-warehouse
+      DB_HOST: postgres-app
       DB_PORT: "5432"
-      DB_NAME: insightflow_warehouse
-      DB_USER: insightflow_wh
-      DB_PASSWORD: insightflow_wh_pass
+      DB_NAME: insightflow_app
+      DB_USER: insightflow
+      DB_PASSWORD: insightflow_pass
+      WAREHOUSE_DB_HOST: postgres-warehouse
+      WAREHOUSE_DB_PORT: "5432"
+      WAREHOUSE_DB_NAME: insightflow_warehouse
+      WAREHOUSE_DB_USER: insightflow_wh
+      WAREHOUSE_DB_PASSWORD: insightflow_wh_pass
     depends_on:
-      postgres-warehouse:
+      schema-init:
+        condition: service_completed_successfully
+      postgres-app:
         condition: service_healthy
-    command: >
-      sh -c "python sample_data.py &&
-             python create_star_schema.py &&
-             python etl_pipeline.py"
+    command: python etl_pipeline.py
+    restart: "no"
 
 volumes:
   pgdata-app:
