@@ -9,9 +9,9 @@
 CREATE TABLE IF NOT EXISTS "dimDate" (
     "dateKey"          SERIAL       PRIMARY KEY,
     "fullDate"         DATE         NOT NULL UNIQUE,
-    year               INTEGER      NOT NULL,
-    quarter            SMALLINT     NOT NULL CHECK (quarter BETWEEN 1 AND 4),
-    month              SMALLINT     NOT NULL CHECK (month BETWEEN 1 AND 12),
+    "year"             INTEGER      NOT NULL,
+    "quarter"          SMALLINT     NOT NULL CHECK ("quarter" BETWEEN 1 AND 4),
+    "month"            SMALLINT     NOT NULL CHECK ("month" BETWEEN 1 AND 12),
     "monthName"        VARCHAR(20)  NOT NULL,
     "weekNumber"       SMALLINT     NOT NULL,
     "dayName"          VARCHAR(20)  NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS "dimCustomer" (
     "customerKey"      SERIAL       PRIMARY KEY,
     "customerId"       INTEGER      NOT NULL,
     "fullName"         VARCHAR(255),
-    email              VARCHAR(255),
+    "email"            VARCHAR(255),
     "validFrom"        DATE         NOT NULL,
     "validTo"          DATE,
     "isActive"         BOOLEAN      NOT NULL DEFAULT TRUE
@@ -45,14 +45,14 @@ CREATE TABLE IF NOT EXISTS "dimStore" (
     "storeKey"         SERIAL       PRIMARY KEY,
     "storeId"          INTEGER      NOT NULL UNIQUE,
     "storeName"        VARCHAR(255) NOT NULL,
-    province           VARCHAR(100)
+    "province"         VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS "dimGeography" (
     "geographyKey"     SERIAL       PRIMARY KEY,
-    province           VARCHAR(100) NOT NULL,
-    country            VARCHAR(100) NOT NULL,
-    UNIQUE (province, country)
+    "province"         VARCHAR(100) NOT NULL,
+    "country"          VARCHAR(100) NOT NULL,
+    UNIQUE ("province", "country")
 );
 
 CREATE TABLE IF NOT EXISTS "dimChannel" (
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS "factSales" (
     "paymentMethodKey"     INTEGER               REFERENCES "dimPaymentMethod"("paymentMethodKey"),
     "orderStatusKey"       INTEGER               REFERENCES "dimOrderStatus"("orderStatusKey"),
     "sourceTransactionId"  VARCHAR(100),
-    quantity               INTEGER      NOT NULL CHECK (quantity > 0),
+    "quantity"             INTEGER      NOT NULL CHECK ("quantity" > 0),
     "unitPrice"            NUMERIC(12, 2) NOT NULL,
     "discountApplied"      NUMERIC(12, 2) NOT NULL DEFAULT 0,
     "grossAmount"          NUMERIC(14, 2) NOT NULL,
