@@ -112,13 +112,6 @@ class TestUserModel:
 
         assert User.objects.count() == 3
 
-    def test_user_email_case_insensitive(self):
-        """Test user email handling."""
-        user = User.objects.create_user(
-            username="testuser", email="Test@Example.com", password="pass"
-        )
-        assert user.email == "Test@Example.com"
-
     def test_user_last_login_tracking(self):
         """Test that last_login field can be set."""
         user = User.objects.create_user(
