@@ -82,7 +82,7 @@ class Extractor:
                 o."orderStatus"                 AS "orderStatus",
                 o."paymentMethod"               AS "paymentMethod",
                 cu."customerId"                 AS "customerId",
-                u."userName"                    AS "customerName",
+                u.username                      AS "customerName",
                 u."email"                       AS email,
                 p."productSKU"                  AS "productSKU",
                 p."productName"                 AS "productName",
@@ -124,7 +124,7 @@ class Extractor:
                 f."freeTextComments"            AS "freeTextComments",
                 f."onlineOrderId"               AS "sourceOrderId",
                 cu."customerId"                 AS "customerId",
-                u."userName"                    AS "customerName",
+                u.username                      AS "customerName",
                 u."email"                       AS email,
                 o."shippingProvince"            AS province
             FROM "feedbackSurvey" f
