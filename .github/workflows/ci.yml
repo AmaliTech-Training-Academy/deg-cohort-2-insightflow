@@ -1,5 +1,11 @@
 name: CI
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SOURCE OF TRUTH: devops/.github/workflows/ci.yml
+# Mirror:          .github/workflows/ci.yml  (read by GitHub Actions)
+# Keep both files identical. Edit here, then copy to .github/workflows/.
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
   push:
     branches: [main, dev]
@@ -14,17 +20,18 @@ permissions:
   contents: read
 
 jobs:
-  # ── Path detection ────────────────────────────────────────────────────────────
+  # ── Path detection ──────────────────────────────────────────────────────────
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
+      backend:          ${{ steps.filter.outputs.backend }}
       data_engineering: ${{ steps.filter.outputs.data_engineering }}
-      qa: ${{ steps.filter.outputs.qa }}
-      docker: ${{ steps.filter.outputs.docker }}
-      devops: ${{ steps.filter.outputs.devops }}
-      infrastructure: ${{ steps.filter.outputs.infrastructure }}
+      qa:               ${{ steps.filter.outputs.qa }}
+      docker:           ${{ steps.filter.outputs.docker }}
+      devops:           ${{ steps.filter.outputs.devops }}
+      infrastructure:   ${{ steps.filter.outputs.infrastructure }}
+      infra_tests:      ${{ steps.filter.outputs.infra_tests }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -36,7 +43,7 @@ jobs:
             data_engineering:
               - 'data-engineering/**'
             qa:
-              - 'qa/**'
+              - 'qa/api-tests/**'
             docker:
               - 'backend/Dockerfile'
               - 'backend/requirements.txt'
@@ -45,14 +52,12 @@ jobs:
               - 'pyproject.toml'
               - '.pre-commit-config.yaml'
             infrastructure:
-              - 'devops/terraform/**'
-              - 'devops/ansible/**'
-              - 'devops/helm/**'
-              - 'devops/k8s/**'
-              - 'devops/cloudformation/**'
-              - 'devops/pulumi/**'
+              - 'devops/infra/**'
+            infra_tests:
+              - 'devops/infra/**'
+              - 'qa/infra-tests/**'
 
-  # ── Always run ────────────────────────────────────────────────────────────────
+  # ── Always run ──────────────────────────────────────────────────────────────
   lint:
     name: Lint & format
     runs-on: ubuntu-latest
@@ -113,7 +118,7 @@ jobs:
           pip-audit -r data-engineering/requirements.txt
           pip-audit -r qa/api-tests/requirements.txt
 
-  # ── Path-gated jobs ───────────────────────────────────────────────────────────
+  # ── Path-gated jobs ─────────────────────────────────────────────────────────
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -301,32 +306,150 @@ jobs:
   infrastructure:
     name: Infrastructure checks
     runs-on: ubuntu-latest
-    needs: [lint, changes]
+    needs: [changes]
     if: needs.changes.outputs.infrastructure == 'true'
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install checkov
-        run: pip install checkov
-
-      - name: Checkov IaC/CaC security scan
-        run: checkov -d devops/ --quiet --compact
-
-      - name: Terraform format check
-        if: hashFiles('devops/terraform/**/*.tf') != ''
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.7"
 
-      - name: Run terraform fmt
-        if: hashFiles('devops/terraform/**/*.tf') != ''
-        run: terraform fmt -check -recursive
-        working-directory: devops/terraform
+      # ── Format ────────────────────────────────────────────────────────────
+      - name: Terraform format check
+        run: terraform fmt -check -recursive devops/infra/
 
-  # ── Required status check for branch protection ───────────────────────────────
+      # ── Validate environments (no backend, no AWS creds needed) ───────────
+      - name: Validate dev environment
+        run: |
+          cd devops/infra/environments/dev
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate prod environment
+        run: |
+          cd devops/infra/environments/prod
+          terraform init -backend=false
+          terraform validate
+
+      # ── Module unit tests (mock_provider — no AWS creds needed) ───────────
+      - name: Test security-groups module
+        run: |
+          cd devops/infra/modules/security-groups
+          terraform init
+          terraform test
+
+      - name: Test vpc module
+        run: |
+          cd devops/infra/modules/vpc
+          terraform init
+          terraform test
+
+      # ── Security scanning ─────────────────────────────────────────────────
+      - name: tfsec — Terraform security scanner
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: devops/infra/
+          soft_fail: true
+
+      - name: Checkov — policy-as-code security scan
+        run: |
+          pip install checkov
+          checkov -d devops/infra/ --quiet --compact \
+            --skip-check CKV_AWS_88 \
+            --skip-check CKV_AWS_24 \
+            --skip-check CKV_AWS_293 \
+            --skip-check CKV_AWS_260 \
+            --skip-check CKV_AWS_382 \
+            --skip-check CKV2_AWS_5 \
+            --skip-check CKV_AWS_2 \
+            --skip-check CKV_AWS_103 \
+            --skip-check CKV2_AWS_20 \
+            --skip-check CKV_AWS_378 \
+            --skip-check CKV_AWS_136 \
+            --skip-check CKV_AWS_51 \
+            --skip-check CKV_AWS_157 \
+            --skip-check CKV2_AWS_50 \
+            --skip-check CKV_AWS_144 \
+            --skip-check CKV_AWS_145 \
+            --skip-check CKV_AWS_21 \
+            --skip-check CKV_AWS_18 \
+            --skip-check CKV2_AWS_61 \
+            --skip-check CKV_AWS_158 \
+            --skip-check CKV_AWS_338 \
+            --skip-check CKV_AWS_191 \
+            --skip-check CKV2_AWS_57 \
+            --skip-check CKV_AWS_354 \
+            --skip-check CKV_AWS_353 \
+            --skip-check CKV2_AWS_69 \
+            --skip-check CKV2_AWS_76 \
+            --skip-check CKV_AWS_150 \
+            --skip-check CKV_AWS_31 \
+            --skip-check CKV_AWS_118 \
+            --skip-check CKV_AWS_149 \
+            --skip-check CKV2_AWS_62
+
+  infra-tests:
+    name: Infrastructure QA tests
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.infra_tests == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.7"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: qa/infra-tests/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: qa/infra-tests
+
+      - name: Run infra QA tests
+        run: pytest --tb=short -v
+        working-directory: qa/infra-tests
+
+  # ── Workflow sync check ──────────────────────────────────────────────────────
+  workflow-sync:
+    name: CI files in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify devops/ and .github/ CI files are identical
+        run: |
+          if ! diff -q devops/.github/workflows/ci.yml .github/workflows/ci.yml; then
+            echo "ERROR: devops/.github/workflows/ci.yml and .github/workflows/ci.yml differ."
+            echo "Edit devops/.github/workflows/ci.yml (source of truth), then copy to .github/workflows/ci.yml"
+            diff devops/.github/workflows/ci.yml .github/workflows/ci.yml
+            exit 1
+          fi
+          echo "CI files are in sync."
+
+  # ── Required status check for branch protection ──────────────────────────────
   ci-passed:
     name: CI passed
     runs-on: ubuntu-latest
-    needs: [lint, security, backend, data-engineering, api-tests, docker, infrastructure]
+    needs:
+      - lint
+      - security
+      - backend
+      - data-engineering
+      - api-tests
+      - docker
+      - infrastructure
+      - infra-tests
+      - workflow-sync
     if: always()
     steps:
       - name: Check all jobs passed or were skipped

@@ -42,4 +42,11 @@ Thumbs.db
 ## Docker overrides
 docker-compose.override.yml
 
-data-engineering/data_eng/
+## Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/.terraform.tfstate.lock.info
+**/terraform.tfvars
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/tfplan

@@ -36,5 +36,5 @@ WAREHOUSE_DATABASE_URL = (
     f"{WAREHOUSE_DB_CONFIG['database']}"
 )
 
-# Legacy alias — keeps older scripts working without changes
+# Legacy alias — keeps etl_pipeline.py working without changes
 DATABASE_URL = WAREHOUSE_DATABASE_URL

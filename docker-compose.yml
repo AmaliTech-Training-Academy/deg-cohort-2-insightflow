@@ -23,12 +23,24 @@ services:
       POSTGRES_DB: insightflow_warehouse
       POSTGRES_USER: insightflow_wh
       POSTGRES_PASSWORD: insightflow_wh_pass
-    ports:
-      - "5433:5432"
     volumes:
       - pgdata-warehouse:/var/lib/postgresql/data
+      - ./data-engineering/warehouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U insightflow_wh -d insightflow_warehouse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: insightflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,39 +61,40 @@ services:
       DB_NAME: insightflow_app
       DB_USER: insightflow
       DB_PASSWORD: insightflow_pass
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres-app:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_data &&
+             gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
-  # ── One-shot init: creates star-schema DDL then exits ────────────────────────
-  # Does NOT depend on the local postgres-warehouse service so it works
-  # unchanged in production against AWS RDS — connection credentials are
-  # supplied via .env (WAREHOUSE_DB_*).  The retry loop in
-  # create_star_schema.py handles any transient start-up delay.
-  schema-init:
-    build:
-      context: ./data-engineering
-      dockerfile: Dockerfile
-    container_name: insightflow-schema-init
-    env_file:
-      - .env
-    command: python create_star_schema.py
-    restart: "no"
-
-  # ── ETL pipeline: runs after schema-init exits successfully ──────────────────
-  etl-pipeline:
+  etl:
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl
-    env_file:
-      - .env
+    environment:
+      DB_HOST: postgres-warehouse
+      DB_PORT: "5432"
+      DB_NAME: insightflow_warehouse
+      DB_USER: insightflow_wh
+      DB_PASSWORD: insightflow_wh_pass
+      REDIS_URL: redis://redis:6379/1
     depends_on:
-      schema-init:
-        condition: service_completed_successfully
-    command: python etl_pipeline.py
-    restart: "no"
+      postgres-warehouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python sample_data.py &&
+             python create_star_schema.py &&
+             python etl_pipeline.py"
 
 volumes:
   pgdata-app:
   pgdata-warehouse:
+  redis-data:

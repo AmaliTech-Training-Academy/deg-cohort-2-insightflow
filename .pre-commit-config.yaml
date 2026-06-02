@@ -42,15 +42,12 @@ repos:
         files: ^(backend|data-engineering|qa)/
         exclude: migrations/
 
-  # Static type checking — qa/ is excluded because conftest.py files in
-  # qa/data-engineering/ and qa/api-tests/ share the same module name and
-  # the hyphenated directory names cannot form valid Python package paths.
+  # Static type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.10.0
     hooks:
       - id: mypy
-        files: ^(backend|data-engineering)/
-        exclude: (test|sample_data)
+        files: ^(backend|data-engineering|qa)/
         args: ["--config-file", "pyproject.toml"]
         additional_dependencies:
           - types-requests
@@ -63,6 +60,7 @@ repos:
         args: ["-c", "pyproject.toml"]
         files: ^(backend|data-engineering)/
         exclude: ^(backend|data-engineering)/.*(test|sample_data).*
+        additional_dependencies: ["bandit[toml]"]
 
   # Conventional commit messages
   - repo: https://github.com/compilerla/conventional-pre-commit
