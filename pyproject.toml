@@ -25,7 +25,7 @@ exclude_dirs = ["tests", "qa"]
 skips = ["B101"]  # allow assert in non-test code
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "insightflow.settings"
+DJANGO_SETTINGS_MODULE = "insightflow.settings.dev"
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
