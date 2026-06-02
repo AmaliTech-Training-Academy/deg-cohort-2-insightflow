@@ -13,7 +13,7 @@ import pandas as pd
 
 log = logging.getLogger("insightflow.transform")
 
-_COUNTRY_DEFAULT = "Ghana"
+_COUNTRY_DEFAULT = "Rwanda"
 
 # Public holidays — extend as needed (YYYY-MM-DD strings)
 _PUBLIC_HOLIDAYS: frozenset[str] = frozenset(
@@ -197,7 +197,7 @@ class Transformer:
     def build_dim_geography(self, df: pd.DataFrame) -> pd.DataFrame:
         """Deduplicate province + country combinations.
 
-        If *df* has no ``country`` column, a default of ``"Ghana"`` is used.
+        If *df* has no ``country`` column, a default of ``"Rwanda"`` is used.
 
         Returns
         -------
