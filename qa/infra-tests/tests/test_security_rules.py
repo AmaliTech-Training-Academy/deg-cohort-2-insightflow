@@ -9,11 +9,10 @@ Rules enforced:
 """
 
 import pytest
-
 from tf_helpers import has_setting, read_env, read_module
 
-
 # ── Production security rules ─────────────────────────────────────────────────
+
 
 class TestProdSecurity:
     @pytest.fixture(scope="class")
@@ -27,24 +26,24 @@ class TestProdSecurity:
         )
 
     def test_ssh_never_enabled(self, prod):
-        assert not has_setting(prod, "enable_ssh", "true"), (
-            "Prod must never set enable_ssh = true"
-        )
+        assert not has_setting(
+            prod, "enable_ssh", "true"
+        ), "Prod must never set enable_ssh = true"
 
     def test_no_public_ip(self, prod):
-        assert has_setting(prod, "enable_public_ip", "false"), (
-            "Prod EC2 must not have a public IP — access via SSM only"
-        )
+        assert has_setting(
+            prod, "enable_public_ip", "false"
+        ), "Prod EC2 must not have a public IP — access via SSM only"
 
     def test_https_enforced(self, prod):
-        assert has_setting(prod, "enable_https", "true"), (
-            "Prod ALB must enforce HTTPS (TLS termination with ACM certificate)"
-        )
+        assert has_setting(
+            prod, "enable_https", "true"
+        ), "Prod ALB must enforce HTTPS (TLS termination with ACM certificate)"
 
     def test_waf_enabled(self, prod):
-        assert has_setting(prod, "enable_waf", "true"), (
-            "Prod ALB must have WAF v2 enabled (OWASP rules + rate limiting)"
-        )
+        assert has_setting(
+            prod, "enable_waf", "true"
+        ), "Prod ALB must have WAF v2 enabled (OWASP rules + rate limiting)"
 
     def test_rds_deletion_protection(self, prod):
         assert has_setting(prod, "deletion_protection", "true"), (
@@ -53,27 +52,28 @@ class TestProdSecurity:
         )
 
     def test_rds_backup_retention(self, prod):
-        assert has_setting(prod, "backup_retention_days", "7"), (
-            "Prod RDS must retain backups for at least 7 days"
-        )
+        assert has_setting(
+            prod, "backup_retention_days", "7"
+        ), "Prod RDS must retain backups for at least 7 days"
 
     def test_s3_versioning_enabled(self, prod):
-        assert has_setting(prod, "versioning_enabled", "true"), (
-            "Prod S3 bucket must have versioning enabled for object recovery"
-        )
+        assert has_setting(
+            prod, "versioning_enabled", "true"
+        ), "Prod S3 bucket must have versioning enabled for object recovery"
 
     def test_redis_tls_required(self, prod):
-        assert has_setting(prod, "transit_encryption_mode", '"required"'), (
-            "Prod Redis must require TLS in transit (no plaintext connections allowed)"
-        )
+        assert has_setting(
+            prod, "transit_encryption_mode", '"required"'
+        ), "Prod Redis must require TLS in transit (no plaintext connections allowed)"
 
     def test_ec2_in_private_subnet(self, prod):
-        assert "private_subnet_a_id" in prod, (
-            "Prod EC2 must be placed in a private subnet (not public)"
-        )
+        assert (
+            "private_subnet_a_id" in prod
+        ), "Prod EC2 must be placed in a private subnet (not public)"
 
 
 # ── Dev / testing permissive rules ───────────────────────────────────────────
+
 
 class TestDevAccess:
     @pytest.fixture(scope="class")
@@ -81,24 +81,24 @@ class TestDevAccess:
         return read_env("dev")
 
     def test_ssh_enabled_for_dev(self, dev):
-        assert has_setting(dev, "enable_ssh", "true"), (
-            "Dev must enable SSH so engineers can shell into EC2 for debugging"
-        )
+        assert has_setting(
+            dev, "enable_ssh", "true"
+        ), "Dev must enable SSH so engineers can shell into EC2 for debugging"
 
     def test_public_ip_for_ssh(self, dev):
-        assert has_setting(dev, "enable_public_ip", "true"), (
-            "Dev EC2 must have a public IP so SSH key-based access works directly"
-        )
+        assert has_setting(
+            dev, "enable_public_ip", "true"
+        ), "Dev EC2 must have a public IP so SSH key-based access works directly"
 
     def test_http_only_no_cert_required(self, dev):
-        assert has_setting(dev, "enable_https", "false"), (
-            "Dev ALB uses HTTP only — no ACM certificate required for testing"
-        )
+        assert has_setting(
+            dev, "enable_https", "false"
+        ), "Dev ALB uses HTTP only — no ACM certificate required for testing"
 
     def test_no_waf_in_dev(self, dev):
-        assert has_setting(dev, "enable_waf", "false"), (
-            "Dev must not enable WAF — it adds cost and is not needed for testing"
-        )
+        assert has_setting(
+            dev, "enable_waf", "false"
+        ), "Dev must not enable WAF — it adds cost and is not needed for testing"
 
     def test_no_deletion_protection_in_dev(self, dev):
         assert has_setting(dev, "deletion_protection", "false"), (
@@ -107,22 +107,23 @@ class TestDevAccess:
         )
 
     def test_skip_final_snapshot_in_dev(self, dev):
-        assert has_setting(dev, "skip_final_snapshot", "true"), (
-            "Dev RDS must skip the final snapshot to allow clean teardown"
-        )
+        assert has_setting(
+            dev, "skip_final_snapshot", "true"
+        ), "Dev RDS must skip the final snapshot to allow clean teardown"
 
     def test_ec2_in_public_subnet(self, dev):
-        assert "public_subnet_a_id" in dev, (
-            "Dev EC2 must be in a public subnet so SSH works via the public IP"
-        )
+        assert (
+            "public_subnet_a_id" in dev
+        ), "Dev EC2 must be in a public subnet so SSH works via the public IP"
 
     def test_ssh_key_wired_up(self, dev):
-        assert "key_name" in dev, (
-            "Dev EC2 must have key_name set — required for SSH authentication"
-        )
+        assert (
+            "key_name" in dev
+        ), "Dev EC2 must have key_name set — required for SSH authentication"
 
 
 # ── Security group module hardening ──────────────────────────────────────────
+
 
 class TestSecurityGroupModule:
     @pytest.fixture(scope="class")
@@ -130,25 +131,26 @@ class TestSecurityGroupModule:
         return read_module("security-groups")
 
     def test_ssh_rule_is_dynamic(self, sg_main):
-        assert "for_each = var.enable_ssh" in sg_main, (
-            "SSH ingress rule must be inside a dynamic block gated by enable_ssh"
-        )
+        assert (
+            "for_each = var.enable_ssh" in sg_main
+        ), "SSH ingress rule must be inside a dynamic block gated by enable_ssh"
 
     def test_rds_only_from_ec2_sg(self, sg_main):
-        assert "security_groups = [aws_security_group.ec2.id]" in sg_main, (
-            "RDS SG must restrict access to the EC2 SG only — no CIDR-based ingress"
-        )
+        assert (
+            "security_groups = [aws_security_group.ec2.id]" in sg_main
+        ), "RDS SG must restrict access to the EC2 SG only — no CIDR-based ingress"
 
     def test_redis_only_from_ec2_sg(self, sg_main):
         content = sg_main
         redis_block_start = content.find('sg-redis"')
         redis_section = content[redis_block_start:]
-        assert "security_groups = [aws_security_group.ec2.id]" in redis_section, (
-            "Redis SG must restrict access to the EC2 SG only"
-        )
+        assert (
+            "security_groups = [aws_security_group.ec2.id]" in redis_section
+        ), "Redis SG must restrict access to the EC2 SG only"
 
 
 # ── EC2 module hardening ──────────────────────────────────────────────────────
+
 
 class TestEC2Module:
     @pytest.fixture(scope="class")
@@ -156,22 +158,23 @@ class TestEC2Module:
         return read_module("ec2")
 
     def test_imdsv2_required(self, ec2_main):
-        assert 'http_tokens = "required"' in ec2_main, (
-            "EC2 must require IMDSv2 (blocks SSRF-based metadata token theft)"
-        )
+        assert (
+            'http_tokens = "required"' in ec2_main
+        ), "EC2 must require IMDSv2 (blocks SSRF-based metadata token theft)"
 
     def test_root_volume_encrypted(self, ec2_main):
-        assert "encrypted             = true" in ec2_main, (
-            "EC2 root EBS volume must be encrypted at rest"
-        )
+        assert (
+            "encrypted             = true" in ec2_main
+        ), "EC2 root EBS volume must be encrypted at rest"
 
     def test_public_ip_controlled_by_variable(self, ec2_main):
-        assert "associate_public_ip_address = var.enable_public_ip" in ec2_main, (
-            "Public IP assignment must be controlled by the enable_public_ip variable"
-        )
+        assert (
+            "associate_public_ip_address = var.enable_public_ip" in ec2_main
+        ), "Public IP assignment must be controlled by the enable_public_ip variable"
 
 
 # ── VPC module networking ─────────────────────────────────────────────────────
+
 
 class TestVPCModule:
     @pytest.fixture(scope="class")
@@ -185,21 +188,21 @@ class TestVPCModule:
         )
 
     def test_dns_support_enabled(self, vpc_main):
-        assert "enable_dns_support   = true" in vpc_main, (
-            "VPC must have DNS support enabled"
-        )
+        assert (
+            "enable_dns_support   = true" in vpc_main
+        ), "VPC must have DNS support enabled"
 
     def test_nat_gateway_uses_eip(self, vpc_main):
-        assert "aws_eip" in vpc_main and "aws_nat_gateway" in vpc_main, (
-            "NAT Gateway must have an Elastic IP for stable outbound addressing"
-        )
+        assert (
+            "aws_eip" in vpc_main and "aws_nat_gateway" in vpc_main
+        ), "NAT Gateway must have an Elastic IP for stable outbound addressing"
 
     def test_private_subnet_routes_through_nat(self, vpc_main):
-        assert "nat_gateway_id = aws_nat_gateway.this.id" in vpc_main, (
-            "Private subnets must route outbound traffic through the NAT Gateway"
-        )
+        assert (
+            "nat_gateway_id = aws_nat_gateway.this.id" in vpc_main
+        ), "Private subnets must route outbound traffic through the NAT Gateway"
 
     def test_public_subnet_routes_through_igw(self, vpc_main):
-        assert "gateway_id = aws_internet_gateway.this.id" in vpc_main, (
-            "Public subnets must route to the Internet Gateway"
-        )
+        assert (
+            "gateway_id = aws_internet_gateway.this.id" in vpc_main
+        ), "Public subnets must route to the Internet Gateway"

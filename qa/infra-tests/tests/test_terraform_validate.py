@@ -4,9 +4,10 @@ Requires `terraform` to be installed and on PATH.
 No AWS credentials needed — uses -backend=false.
 """
 
-import subprocess
-import shutil
 import os
+import shutil
+import subprocess
+
 import pytest
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
@@ -35,6 +36,7 @@ pytestmark = pytest.mark.skipif(
 
 # ── Format ────────────────────────────────────────────────────────────────────
 
+
 def test_terraform_fmt_check():
     result = tf(["fmt", "-check", "-recursive", "devops/infra/"], cwd=REPO_ROOT)
     assert result.returncode == 0, (
@@ -45,6 +47,7 @@ def test_terraform_fmt_check():
 
 
 # ── Validate environments ─────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def init_dev(tmp_path_factory):
@@ -64,27 +67,28 @@ def init_prod(tmp_path_factory):
 
 def test_dev_environment_validates(init_dev):
     result = tf(["validate", "-no-color"], cwd=init_dev)
-    assert result.returncode == 0, (
-        f"terraform validate failed for dev environment:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"terraform validate failed for dev environment:\n{result.stderr}"
 
 
 def test_prod_environment_validates(init_prod):
     result = tf(["validate", "-no-color"], cwd=init_prod)
-    assert result.returncode == 0, (
-        f"terraform validate failed for prod environment:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"terraform validate failed for prod environment:\n{result.stderr}"
 
 
 # ── Module unit tests (mock_provider — no AWS creds needed) ──────────────────
+
 
 @pytest.fixture(scope="module")
 def init_sg_module():
     module_dir = os.path.join(INFRA_ROOT, "modules", "security-groups")
     result = tf(["init", "-no-color"], cwd=module_dir)
-    assert result.returncode == 0, (
-        f"terraform init failed for security-groups:\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"terraform init failed for security-groups:\n{result.stderr}"
     return module_dir
 
 
@@ -106,6 +110,6 @@ def test_security_groups_module_tests_pass(init_sg_module):
 
 def test_vpc_module_tests_pass(init_vpc_module):
     result = tf(["test", "-no-color"], cwd=init_vpc_module)
-    assert result.returncode == 0, (
-        f"terraform test failed for vpc module:\n{result.stdout}\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"terraform test failed for vpc module:\n{result.stdout}\n{result.stderr}"
