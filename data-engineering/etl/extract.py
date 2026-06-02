@@ -47,7 +47,7 @@ class Extractor:
                 cat."name"                      AS "categoryName",
                 tl."quantity"                   AS quantity,
                 tl."unitPrice"                  AS "unitPrice",
-                tl."discountAApplied"           AS "discountApplied",
+                tl."discountApplied"            AS "discountApplied",
                 tl."totalAmount"                AS "totalAmount"
             FROM "posTransactionLine" tl
             JOIN "posTransaction"   t   ON tl."posTransactionId" = t."posTransactionId"

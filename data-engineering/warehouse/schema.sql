@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS "dimProduct" (
 -- SCD Type 2: tracks customer attribute changes over time
 CREATE TABLE IF NOT EXISTS "dimCustomer" (
     "customerKey"      SERIAL       PRIMARY KEY,
-    "customerId"       INTEGER      NOT NULL,
+    "customerId"       VARCHAR(255) NOT NULL,
     "fullName"         VARCHAR(255),
     "email"            VARCHAR(255),
     "validFrom"        DATE         NOT NULL,

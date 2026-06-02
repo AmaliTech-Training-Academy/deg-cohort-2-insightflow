@@ -188,7 +188,7 @@ class Loader:
                         "validFrom": today,
                     },
                 )
-                sku_to_key[sku] = result.scalar()
+                sku_to_key[sku] = int(result.scalar_one())
             else:
                 changed = (
                     existing.productName != product_name
@@ -222,7 +222,7 @@ class Loader:
                             "validFrom": today,
                         },
                     )
-                    sku_to_key[sku] = result.scalar()
+                    sku_to_key[sku] = int(result.scalar_one())
                 else:
                     sku_to_key[sku] = existing.productKey
 
@@ -235,7 +235,7 @@ class Loader:
 
     def upsert_dim_customer(
         self, customers_df: pd.DataFrame, conn: Connection
-    ) -> dict[int, int]:
+    ) -> dict[str, int]:
         """SCD Type 2 upsert for dimCustomer.
 
         Returns
@@ -246,10 +246,10 @@ class Loader:
             return {}
 
         today = date.today()
-        cid_to_key: dict[int, int] = {}
+        cid_to_key: dict[str, int] = {}
 
         for _, row in customers_df.iterrows():
-            cid = int(row["customerId"])
+            cid = str(row["customerId"])
             full_name = row.get("fullName")
             email = row.get("email")
             is_active = bool(row.get("isActive", True))
@@ -282,7 +282,7 @@ class Loader:
                         "validFrom": today,
                     },
                 )
-                cid_to_key[cid] = result.scalar()
+                cid_to_key[cid] = int(result.scalar_one())
             else:
                 changed = (
                     existing.fullName != full_name
@@ -316,7 +316,7 @@ class Loader:
                             "isActive": is_active,
                         },
                     )
-                    cid_to_key[cid] = result.scalar()
+                    cid_to_key[cid] = int(result.scalar_one())
                 else:
                     cid_to_key[cid] = existing.customerKey
 
