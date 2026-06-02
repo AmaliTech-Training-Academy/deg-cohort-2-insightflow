@@ -1,6 +1,6 @@
-from django.db import models
 from apps.ingestion.models.base import Customer
 from apps.ingestion.models.inventory import Product
+from django.db import models
 
 
 class OnlineOrder(models.Model):

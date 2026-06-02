@@ -1,6 +1,6 @@
-from django.db import models
-from apps.ingestion.models.inventory import Store, Product
 from apps.authentication.models import User
+from apps.ingestion.models.inventory import Product, Store
+from django.db import models
 
 
 class Cashier(models.Model):

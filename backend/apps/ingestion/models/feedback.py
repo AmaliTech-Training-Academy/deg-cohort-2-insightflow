@@ -1,8 +1,6 @@
-from django.db import models
-from django.contrib.auth.models import AbstractUser
-
 from apps.ingestion.models.base import Customer
 from apps.ingestion.models.online_orders import OnlineOrder
+from django.db import models
 
 
 class FeedbackSurvey(models.Model):
