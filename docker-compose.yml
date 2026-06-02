@@ -53,46 +53,32 @@ services:
       postgres-app:
         condition: service_healthy
 
-  # ── One-shot init container: creates the star-schema DDL then exits ──────────
+  # ── One-shot init: creates star-schema DDL then exits ────────────────────────
+  # Does NOT depend on the local postgres-warehouse service so it works
+  # unchanged in production against AWS RDS — connection credentials are
+  # supplied via .env (WAREHOUSE_DB_*).  The retry loop in
+  # create_star_schema.py handles any transient start-up delay.
   schema-init:
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-schema-init
-    environment:
-      WAREHOUSE_DB_HOST: postgres-warehouse
-      WAREHOUSE_DB_PORT: "5432"
-      WAREHOUSE_DB_NAME: insightflow_warehouse
-      WAREHOUSE_DB_USER: insightflow_wh
-      WAREHOUSE_DB_PASSWORD: insightflow_wh_pass
-    depends_on:
-      postgres-warehouse:
-        condition: service_healthy
+    env_file:
+      - .env
     command: python create_star_schema.py
     restart: "no"
 
-  # ── ETL pipeline: runs after schema is ready; exits 0 when done ──────────────
+  # ── ETL pipeline: runs after schema-init exits successfully ──────────────────
   etl-pipeline:
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl
-    environment:
-      DB_HOST: postgres-app
-      DB_PORT: "5432"
-      DB_NAME: insightflow_app
-      DB_USER: insightflow
-      DB_PASSWORD: insightflow_pass
-      WAREHOUSE_DB_HOST: postgres-warehouse
-      WAREHOUSE_DB_PORT: "5432"
-      WAREHOUSE_DB_NAME: insightflow_warehouse
-      WAREHOUSE_DB_USER: insightflow_wh
-      WAREHOUSE_DB_PASSWORD: insightflow_wh_pass
+    env_file:
+      - .env
     depends_on:
       schema-init:
         condition: service_completed_successfully
-      postgres-app:
-        condition: service_healthy
     command: python etl_pipeline.py
     restart: "no"
 

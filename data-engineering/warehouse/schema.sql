@@ -141,4 +141,4 @@ CREATE INDEX IF NOT EXISTS "idxFactInvProduct"       ON "factInventorySnapshot"(
 CREATE INDEX IF NOT EXISTS "idxDimProductSKU"        ON "dimProduct"("productSKU");
 CREATE INDEX IF NOT EXISTS "idxDimProductCurrent"    ON "dimProduct"("productSKU") WHERE "isCurrent" = TRUE;
 CREATE INDEX IF NOT EXISTS "idxDimCustomerId"        ON "dimCustomer"("customerId");
-CREATE INDEX IF NOT EXISTS "idxDimCustomerCurrent"   ON "dimCustomer"("customerId") WHERE "isCurrent" = TRUE;
+CREATE INDEX IF NOT EXISTS "idxDimCustomerCurrent"   ON "dimCustomer"("customerId") WHERE "isActive" = TRUE;
