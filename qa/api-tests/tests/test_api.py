@@ -43,7 +43,6 @@ class TestAuth:
         assert resp.status_code == 400
 
 
-@pytest.mark.skip(reason="datasources app removed — replaced by apps.ingestion")
 class TestDataSources:
     def test_get_all_datasources(self, base_url, auth_headers):
         resp = requests.get(f"{base_url}/api/datasources/", headers=auth_headers)
@@ -94,7 +93,6 @@ class TestDataSources:
         assert resp.status_code == 401
 
 
-@pytest.mark.skip(reason="pipelines app removed — see apps.ingestion for replacement")
 class TestPipelines:
     @pytest.fixture(scope="class")
     def datasource_id(self, base_url, auth_headers):

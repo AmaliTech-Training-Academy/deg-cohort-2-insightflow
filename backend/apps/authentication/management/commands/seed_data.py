@@ -1,10 +1,11 @@
 from apps.authentication.models import Role, User
+from apps.datasources.models import DataSource, DataSourceType
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 
 class Command(BaseCommand):
-    help = "Seeds the database with default users"
+    help = "Seeds the database with initial users and data sources"
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -42,6 +43,32 @@ class Command(BaseCommand):
             regular_user.save()
             self.stdout.write(
                 self.style.SUCCESS("  Created regular user: user@amalitech.com")
+            )
+
+        ds1, created = DataSource.objects.get_or_create(
+            name="Sales Data CSV",
+            defaults={
+                "type": DataSourceType.CSV,
+                "file_path": "/data/sales.csv",
+                "created_by": admin,
+            },
+        )
+        if created:
+            self.stdout.write(
+                self.style.SUCCESS("  Created data source: Sales Data CSV")
+            )
+
+        ds2, created = DataSource.objects.get_or_create(
+            name="User Analytics API",
+            defaults={
+                "type": DataSourceType.API,
+                "connection_url": "https://api.example.com/analytics",
+                "created_by": admin,
+            },
+        )
+        if created:
+            self.stdout.write(
+                self.style.SUCCESS("  Created data source: User Analytics API")
             )
 
         self.stdout.write(self.style.SUCCESS("Database seeding complete."))
