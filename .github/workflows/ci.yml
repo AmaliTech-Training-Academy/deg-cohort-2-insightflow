@@ -425,20 +425,31 @@ jobs:
 
   # ── Workflow sync check ──────────────────────────────────────────────────────
   workflow-sync:
-    name: CI files in sync
+    name: Workflow files in sync
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify devops/ and .github/ CI files are identical
+      - name: Verify devops/ and .github/ workflow files are identical
         run: |
-          if ! diff -q devops/.github/workflows/ci.yml .github/workflows/ci.yml; then
-            echo "ERROR: devops/.github/workflows/ci.yml and .github/workflows/ci.yml differ."
-            echo "Edit devops/.github/workflows/ci.yml (source of truth), then copy to .github/workflows/ci.yml"
-            diff devops/.github/workflows/ci.yml .github/workflows/ci.yml
+          FAILED=0
+          for WORKFLOW in ci.yml deploy-dev.yml deploy-prod.yml; do
+            SRC="devops/.github/workflows/$WORKFLOW"
+            DST=".github/workflows/$WORKFLOW"
+            if ! diff -q "$SRC" "$DST" > /dev/null 2>&1; then
+              echo "ERROR: $SRC and $DST differ."
+              diff "$SRC" "$DST" || true
+              FAILED=1
+            else
+              echo "OK: $WORKFLOW is in sync"
+            fi
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            echo ""
+            echo "Source of truth is devops/.github/workflows/."
+            echo "Edit there, then copy to .github/workflows/."
             exit 1
           fi
-          echo "CI files are in sync."
 
   # ── Required status check for branch protection ──────────────────────────────
   ci-passed:
