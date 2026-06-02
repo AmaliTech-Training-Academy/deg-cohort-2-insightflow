@@ -1,6 +1,7 @@
 # sales_dashboard_cards.py
-COLOUR_BLUE = "#205430"       
-COLOUR_BLUE_LIGHT = "#315232"  
+# Chart colours
+COLOUR_BLUE = "#1A56DB"  # line charts
+COLOUR_BLUE_LIGHT = "#3B82F6"  # bar charts
 
 # Optional date-range filter injected into time-series queries via template tags
 DATE_FILTER_SNIPPET = (
