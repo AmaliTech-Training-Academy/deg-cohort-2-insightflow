@@ -69,8 +69,7 @@ CREATE TABLE IF NOT EXISTS dim_payment_method (
 
 CREATE TABLE IF NOT EXISTS dim_order_status (
     order_status_key SERIAL       PRIMARY KEY,
-    status_name      VARCHAR(100) NOT NULL UNIQUE,
-    status_group     VARCHAR(50)
+    status_name      VARCHAR(100) NOT NULL UNIQUE
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
