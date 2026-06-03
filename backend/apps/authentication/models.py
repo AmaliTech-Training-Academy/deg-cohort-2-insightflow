@@ -2,20 +2,15 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
-class Role(models.TextChoices):
-    ADMIN = "ADMIN", "Admin"
-    USER = "USER", "User"
-
-
 class User(AbstractUser):
-    email = models.EmailField(unique=True)
-    role = models.CharField(max_length=10, choices=Role.choices, default=Role.USER)
-
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["username", "first_name", "last_name"]
+    id = models.BigAutoField(primary_key=True, db_column="userId", default=None)
+    role = models.CharField(max_length=255, db_column="role", blank=True, null=True)
 
     class Meta:
         db_table = "users"
 
-    def __str__(self):
-        return self.email
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._meta.get_field("username").db_column = "username"
+        self._meta.get_field("email").db_column = "email"
+        self._meta.get_field("is_active").db_column = "is_active"

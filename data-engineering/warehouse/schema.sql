@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS "dimProduct" (
 -- SCD Type 2: tracks customer attribute changes over time
 CREATE TABLE IF NOT EXISTS "dimCustomer" (
     "customerKey"      SERIAL       PRIMARY KEY,
-    "customerId"       INTEGER      NOT NULL,
+    "customerId"       VARCHAR(255) NOT NULL,
     "fullName"         VARCHAR(255),
     "email"            VARCHAR(255),
     "validFrom"        DATE         NOT NULL,
@@ -141,4 +141,4 @@ CREATE INDEX IF NOT EXISTS "idxFactInvProduct"       ON "factInventorySnapshot"(
 CREATE INDEX IF NOT EXISTS "idxDimProductSKU"        ON "dimProduct"("productSKU");
 CREATE INDEX IF NOT EXISTS "idxDimProductCurrent"    ON "dimProduct"("productSKU") WHERE "isCurrent" = TRUE;
 CREATE INDEX IF NOT EXISTS "idxDimCustomerId"        ON "dimCustomer"("customerId");
-CREATE INDEX IF NOT EXISTS "idxDimCustomerCurrent"   ON "dimCustomer"("customerId") WHERE "isCurrent" = TRUE;
+CREATE INDEX IF NOT EXISTS "idxDimCustomerCurrent"   ON "dimCustomer"("customerId") WHERE "isActive" = TRUE;
