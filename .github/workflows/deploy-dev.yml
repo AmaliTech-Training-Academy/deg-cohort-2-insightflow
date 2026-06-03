@@ -89,7 +89,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           REPO_URL:   https://github.com/${{ github.repository }}.git
         run: |
-          TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2)
+          TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2 | cut -d'#' -f1 | tr -d '[:space:]')
 
           python3 -c "
           import json, os
