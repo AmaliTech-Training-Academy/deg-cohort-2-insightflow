@@ -186,12 +186,13 @@ log "Rolling-replacing etl..."
 $COMPOSE up -d --no-deps --remove-orphans etl
 
 # ── 6. Post-deploy health check ───────────────────────────────────────────────
+# Allow extra time on first deploy — migrations + seed_data can take several minutes.
 log "Post-deploy health check (port 8080)..."
 LIVE_OK=false
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
          "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
-  log "  live [$i/30] HTTP ${HTTP}"
+  log "  live [$i/60] HTTP ${HTTP}"
   if [[ "$HTTP" == "200" ]]; then LIVE_OK=true; break; fi
   sleep "$HC_INTERVAL"
 done
