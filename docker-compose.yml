@@ -45,6 +45,20 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    image: insightflow-frontend:${DEPLOY_TAG:-local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+    container_name: insightflow-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   backend:
     image: insightflow-backend:${DEPLOY_TAG:-local}
     build:
