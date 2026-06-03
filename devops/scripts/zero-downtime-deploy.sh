@@ -54,10 +54,10 @@ source /tmp/deploy.env
 # ── Validate required inputs ──────────────────────────────────────────────────
 : "${COMMIT_SHA:?Must be set by CI}"
 : "${GITHUB_REPO_URL:?Must be set by CI}"
-: "${GITHUB_TOKEN:?Must be set by CI}"
 : "${APP_DIR:?Must come from deploy.env}"
 : "${REPO_DIR:?Must come from deploy.env}"
 : "${DEPLOY_ENV:?Must come from deploy.env}"
+# GITHUB_TOKEN is optional — only needed for private repos
 
 # ── Derived constants ─────────────────────────────────────────────────────────
 SHA_SHORT="${COMMIT_SHA:0:7}"
@@ -92,17 +92,21 @@ log "Rollback point: DEPLOY_TAG=${PREV_TAG}"
 echo "$PREV_TAG" > "$ROLLBACK_FILE"
 
 # ── 2. Update source code ─────────────────────────────────────────────────────
-GIT_CRED_HELPER="!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
+# For public repos no token is needed. For private repos set GITHUB_TOKEN.
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  GIT_OPTS=(-c "credential.helper=!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f")
+else
+  GIT_OPTS=()
+fi
 
 if [[ ! -d "${REPO_DIR}/.git" ]]; then
   log "First deploy — cloning ${GITHUB_REPO_URL} → ${REPO_DIR}"
-  git -c credential.helper="$GIT_CRED_HELPER" \
-    clone --filter=blob:none --no-checkout "$GITHUB_REPO_URL" "$REPO_DIR"
+  git "${GIT_OPTS[@]}" clone --filter=blob:none --no-checkout "$GITHUB_REPO_URL" "$REPO_DIR"
 fi
 
 cd "$REPO_DIR"
 log "Fetching origin..."
-git -c credential.helper="$GIT_CRED_HELPER" fetch --quiet origin
+git "${GIT_OPTS[@]}" fetch --quiet origin
 git checkout --quiet --detach "$COMMIT_SHA"
 log "Checked out ${COMMIT_SHA}"
 
