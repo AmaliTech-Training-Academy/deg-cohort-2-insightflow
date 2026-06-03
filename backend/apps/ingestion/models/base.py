@@ -45,6 +45,7 @@ class InjectionJob(models.Model):
     error_report: dict[str, Any] | None = models.JSONField(  # type: ignore[assignment]
         null=True, blank=True, help_text="Detailed error logs filled after processing"
     )
+    task_id = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

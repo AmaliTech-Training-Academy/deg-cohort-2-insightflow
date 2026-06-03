@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -6,7 +7,13 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+
+def health(_request):
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    path("health/", health),
     path("admin/", admin.site.urls),
     # Ingestion endpoints
     path("api/ingestion/", include("apps.ingestion.urls")),
