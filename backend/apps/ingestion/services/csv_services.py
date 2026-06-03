@@ -131,8 +131,12 @@ class POSIngestionService:
             with db_transaction.atomic():
                 # Pre-fetch valid FK sets — one query each, O(1) lookup in loop
                 valid_store_ids = set(Store.objects.values_list("storeId", flat=True))
-                valid_cashier_ids = set(Cashier.objects.values_list("cashierId", flat=True))
-                valid_product_skus = set(Product.objects.values_list("productSKU", flat=True))
+                valid_cashier_ids = set(
+                    Cashier.objects.values_list("cashierId", flat=True)
+                )
+                valid_product_skus = set(
+                    Product.objects.values_list("productSKU", flat=True)
+                )
 
                 # Group valid rows by transaction_id
                 transactions_map: dict = {}
@@ -150,18 +154,24 @@ class POSIngestionService:
                 for txn_id, txn_data in transactions_map.items():
                     # ── FK existence checks — skip missing references ─────
                     if int(txn_data["store_id"]) not in valid_store_ids:
-                        row_errors.append({
-                            "transaction_id": txn_id,
-                            "field": "store_id",
-                            "error": f'Store {txn_data["store_id"]} does not exist',
-                        })
+                        row_errors.append(
+                            {
+                                "transaction_id": txn_id,
+                                "field": "store_id",
+                                "error": f'Store {txn_data["store_id"]} does not exist',
+                            }
+                        )
                         continue
                     if int(txn_data["cashier_id"]) not in valid_cashier_ids:
-                        row_errors.append({
-                            "transaction_id": txn_id,
-                            "field": "cashier_id",
-                            "error": f'Cashier {txn_data["cashier_id"]} does not exist',
-                        })
+                        row_errors.append(
+                            {
+                                "transaction_id": txn_id,
+                                "field": "cashier_id",
+                                "error": (
+                                    f'Cashier {txn_data["cashier_id"]} does not exist'
+                                ),
+                            }
+                        )
                         continue
 
                     # ── Parse date — produce a timezone-aware UTC datetime ──
@@ -223,11 +233,16 @@ class POSIngestionService:
                     line_records = []
                     for line_idx, line_dict in enumerate(txn_data["lines"], 1):
                         if line_dict["product_sku"] not in valid_product_skus:
-                            row_errors.append({
-                                "transaction_id": txn_id,
-                                "field": "product_sku",
-                                "error": f'Product {line_dict["product_sku"]} does not exist',
-                            })
+                            row_errors.append(
+                                {
+                                    "transaction_id": txn_id,
+                                    "field": "product_sku",
+                                    "error": (
+                                        f'Product {line_dict["product_sku"]}'
+                                        " does not exist"
+                                    ),
+                                }
+                            )
                             continue
                         try:
                             # Zero-pad both parts so txn=12/line=31 ≠ txn=123/line=1
