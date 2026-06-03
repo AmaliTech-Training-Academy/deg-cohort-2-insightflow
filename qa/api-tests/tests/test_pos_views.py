@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from apps.core.exceptions import (
-    CSVParseException,
     FileSizeLimitException,
     UnsupportedFileTypeException,
     ValidationException,

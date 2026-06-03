@@ -3,15 +3,14 @@ from datetime import datetime as dt
 from decimal import Decimal
 
 import pandas as pd
-from django.db import transaction as db_transaction
-from django.utils import timezone
-
 from apps.core.exceptions import (
     CSVParseException,
     FileSizeLimitException,
     UnsupportedFileTypeException,
     ValidationException,
 )
+from django.db import transaction as db_transaction
+from django.utils import timezone
 
 from ..models.base import InjectionJob
 from ..models.pos import PosTransaction, PosTransactionLine
@@ -35,15 +34,11 @@ class POSIngestionService:
         # size check
         if file.size > MAX_UPLOAD_BYTES:
             mb = round(file.size / (1024 * 1024), 1)
-            raise FileSizeLimitException(
-                detail=f"File is {mb}MB — maximum is 50MB"
-            )
+            raise FileSizeLimitException(detail=f"File is {mb}MB — maximum is 50MB")
 
         # extension check
         if not file.name.lower().endswith(".csv"):
-            raise UnsupportedFileTypeException(
-                detail="Only .csv files are accepted"
-            )
+            raise UnsupportedFileTypeException(detail="Only .csv files are accepted")
 
         # can pandas even open it?
         try:
