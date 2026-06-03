@@ -119,6 +119,9 @@ DEPLOY_TAG="$DEPLOY_TAG" $COMPOSE build \
 log "Build complete"
 
 # ── 4. Canary pre-flight ──────────────────────────────────────────────────────
+# Ensure the compose network exists before the canary starts (first deploy).
+docker network create "${PROJECT}_default" 2>/dev/null || true
+
 log "Starting canary on port ${CANARY_PORT}..."
 docker rm -f insightflow-canary 2>/dev/null || true
 
