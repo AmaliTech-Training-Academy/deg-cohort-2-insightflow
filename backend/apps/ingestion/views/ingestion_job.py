@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models.base import IngestionJob
+from ..models.base import InjectionJob
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class IngestionJobStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, job_id):
-        job = get_object_or_404(IngestionJob, id=job_id)
+        job = get_object_or_404(InjectionJob, id=job_id)
 
         response = {
             'job_id':     job.id,
@@ -35,8 +35,8 @@ class IngestionJobStatusView(APIView):
 
         # attach error report only when job is done
         if job.status in [
-            IngestionJob.STATUS_COMPLETED,
-            IngestionJob.STATUS_FAILED
+            InjectionJob.StatusChoices.COMPLETED,
+            InjectionJob.StatusChoices.FAILED,
         ]:
             if job.error_report:
                 response['error_report'] = job.error_report

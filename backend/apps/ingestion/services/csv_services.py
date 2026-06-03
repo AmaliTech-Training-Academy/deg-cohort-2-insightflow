@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from django.db import transaction as db_transaction
 
-from ..models.base import IngestionJob
+from ..models.base import InjectionJob
 from ..models.pos import PosTransaction, PosTransactionLine
 from ..validators.pos import validate_pos_file_columns, validate_pos_row
 
@@ -49,18 +49,16 @@ class POSIngestionService:
 
         return {'ok': True}
 
-    def accept_upload(self, file, uploaded_by=None) -> IngestionJob:
+    def accept_upload(self, file, uploaded_by=None) -> InjectionJob:
         """
-        Creates the IngestionJob and saves the file to disk.
+        Creates the InjectionJob and saves the file to disk.
         Returns the job so the view can dispatch the Celery task.
         """
         total_rows = self._count_rows(file)
 
-        job = IngestionJob.objects.create(
-            status=IngestionJob.STATUS_PENDING,
+        job = InjectionJob.objects.create(
+            status=InjectionJob.StatusChoices.PENDING,
             total_rows=total_rows,
-            valid_rows=0,
-            error_rows=0,
         )
 
         job.file = file
@@ -76,7 +74,7 @@ class POSIngestionService:
 
     # ── Phase 2 — Celery task calls this ─────────────────────
 
-    def process_job(self, job: IngestionJob) -> None:
+    def process_job(self, job: InjectionJob) -> None:
         """
         Reads the saved CSV row by row.
         - Groups rows by transaction_id
@@ -84,7 +82,7 @@ class POSIngestionService:
         - Creates PosTransactionLine records for each product
         - Logs errors for invalid rows
         """
-        job.status = IngestionJob.STATUS_RUNNING
+        job.status = InjectionJob.StatusChoices.RUNNING
         job.save(update_fields=['status'])
 
         try:
@@ -201,7 +199,7 @@ class POSIngestionService:
                             })
 
                 # ── Mark job complete ────
-                job.status = IngestionJob.STATUS_COMPLETED
+                job.status = InjectionJob.StatusChoices.COMPLETED
                 job.valid_rows = len(valid_rows)
                 job.error_rows = len(row_errors)
                 job.error_report = {'row_errors': row_errors} if row_errors else {}
@@ -215,7 +213,7 @@ class POSIngestionService:
 
         except Exception as e:
             logger.exception(f'POS job {job.id} failed — {e}')
-            job.status = IngestionJob.STATUS_FAILED
+            job.status = InjectionJob.StatusChoices.FAILED
             job.error_report = {'fatal_error': str(e)}
             job.save(update_fields=['status', 'error_report'])
             raise

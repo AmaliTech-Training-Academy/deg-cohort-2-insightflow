@@ -6,8 +6,8 @@ from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ..models.pos import POSStagingRecord
-from ..serializers.pos import POSStagingRecordSerializer
+from ..models.pos import PosTransactionLine
+from ..serializers.pos import PosTransactionLineSerializer
 from ..services.csv_services import POSIngestionService
 from ..tasks.process_pos import process_pos_file
 
@@ -20,12 +20,12 @@ class POSStagingListCreateView(ListCreateAPIView):
     GET  /api/ingestion/pos/   — list all POS staging records
     POST /api/ingestion/pos/   — upload a POS CSV file
     """
-    serializer_class = POSStagingRecordSerializer
+    serializer_class = PosTransactionLineSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        return POSStagingRecord.objects.select_related('job').order_by('-id')
+        return PosTransactionLine.objects.select_related('posTransactionId', 'productSKU').order_by('-lineId')
 
     def create(self, request, *args, **kwargs):
         # if file is in the request → CSV upload
@@ -76,6 +76,6 @@ class POSStagingDetailView(RetrieveUpdateDestroyAPIView):
     PATCH  /api/ingestion/pos/<pk>/
     DELETE /api/ingestion/pos/<pk>/
     """
-    serializer_class = POSStagingRecordSerializer
+    serializer_class = PosTransactionLineSerializer
     permission_classes = [IsAuthenticated]
-    queryset = POSStagingRecord.objects.select_related('job').all()
+    queryset = PosTransactionLine.objects.select_related('posTransactionId', 'productSKU').all()

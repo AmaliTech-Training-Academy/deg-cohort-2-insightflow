@@ -2,7 +2,7 @@ import logging
 
 from celery import shared_task
 
-from ..models.base import IngestionJob
+from ..models.base import InjectionJob
 from ..services.csv_services import POSIngestionService
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,9 @@ def process_pos_file(self, job_id: int) -> None:
     logger.info(f'Starting POS processing — job_id={job_id}')
 
     try:
-        job = IngestionJob.objects.get(id=job_id)
+        job = InjectionJob.objects.get(id=job_id)
 
-    except IngestionJob.DoesNotExist:
+    except InjectionJob.DoesNotExist:
         # job was deleted before task ran — nothing to do
         logger.warning(f'Job {job_id} not found — skipping')
         return

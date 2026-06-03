@@ -9,6 +9,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
+from apps.ingestion.models.base import InjectionJob
 from apps.ingestion.services.csv_services import POSIngestionService
 
 
@@ -170,3 +171,99 @@ class TestPOSIngestionServiceCountRows:
 
         # File should be seeked back to 0
         assert file.tell() == 0
+
+
+class TestPOSIngestionServiceAcceptUpload:
+    """Test POSIngestionService.accept_upload() — InjectionJob creation."""
+
+    @pytest.fixture
+    def service(self):
+        return POSIngestionService()
+
+    def _make_file(self, rows=2):
+        header = 'transaction_id,date,store_id,cashier_id,product_sku,quantity,unit_price,discount_applied,total\n'
+        body = ''.join(
+            f'TXN{i:03d},2024-06-01,1,1,PROD-0000001,2,25.00,0.00,50.00\n'
+            for i in range(1, rows + 1)
+        )
+        f = io.BytesIO((header + body).encode())
+        f.name = 'test.csv'
+        return f
+
+    def test_accept_upload_returns_injection_job(self, service):
+        """accept_upload returns the InjectionJob instance created."""
+        f = self._make_file()
+        mock_job = MagicMock()
+        mock_job.id = 1
+
+        with patch('apps.ingestion.services.csv_services.InjectionJob.objects.create') as mock_create:
+            mock_create.return_value = mock_job
+
+            result = service.accept_upload(f)
+
+            assert result is mock_job
+
+    def test_accept_upload_calls_objects_create(self, service):
+        """accept_upload calls InjectionJob.objects.create exactly once."""
+        f = self._make_file()
+        mock_job = MagicMock()
+
+        with patch('apps.ingestion.services.csv_services.InjectionJob.objects.create') as mock_create:
+            mock_create.return_value = mock_job
+
+            service.accept_upload(f)
+
+            mock_create.assert_called_once()
+
+    def test_accept_upload_sets_status_pending(self, service):
+        """accept_upload creates the job with StatusChoices.PENDING."""
+        f = self._make_file()
+        mock_job = MagicMock()
+
+        with patch('apps.ingestion.services.csv_services.InjectionJob.objects.create') as mock_create:
+            mock_create.return_value = mock_job
+
+            service.accept_upload(f)
+
+            kwargs = mock_create.call_args[1]
+            assert kwargs['status'] == InjectionJob.StatusChoices.PENDING
+
+    def test_accept_upload_sets_total_rows(self, service):
+        """accept_upload passes the correct row count to objects.create."""
+        f = self._make_file(rows=3)
+        mock_job = MagicMock()
+
+        with patch('apps.ingestion.services.csv_services.InjectionJob.objects.create') as mock_create:
+            mock_create.return_value = mock_job
+
+            service.accept_upload(f)
+
+            kwargs = mock_create.call_args[1]
+            assert kwargs['total_rows'] == 3
+
+    def test_accept_upload_zero_rows_file(self, service):
+        """accept_upload with a header-only file sets total_rows=0."""
+        header_only = io.BytesIO(b'col1,col2\n')
+        header_only.name = 'empty.csv'
+        mock_job = MagicMock()
+
+        with patch('apps.ingestion.services.csv_services.InjectionJob.objects.create') as mock_create:
+            mock_create.return_value = mock_job
+
+            service.accept_upload(header_only)
+
+            kwargs = mock_create.call_args[1]
+            assert kwargs['total_rows'] == 0
+
+    def test_accept_upload_assigns_file_to_job(self, service):
+        """accept_upload assigns the file to the job and calls save."""
+        f = self._make_file()
+        mock_job = MagicMock()
+
+        with patch('apps.ingestion.services.csv_services.InjectionJob.objects.create') as mock_create:
+            mock_create.return_value = mock_job
+
+            service.accept_upload(f)
+
+            assert mock_job.file == f
+            mock_job.save.assert_called_once_with(update_fields=['file'])
