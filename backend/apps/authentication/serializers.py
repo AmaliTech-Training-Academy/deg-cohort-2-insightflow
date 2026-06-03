@@ -30,9 +30,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True, required=True, style={"input_type": "password"}
     )
-    password2 = serializers.CharField(
-        write_only=True, required=True, style={"input_type": "password"}
-    )
 
     class Meta:
         model = User
@@ -40,7 +37,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             "email",
             "username",
             "password",
-            "password2",
             "first_name",
             "last_name",
             "role",
@@ -51,12 +47,30 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name": {"required": True},
         }
 
-    def validate(self, data):
-        if data["password"] != data["password2"]:
+    def validate_password(self, value):
+        if len(value) < 8:
             raise serializers.ValidationError(
-                {"password": _("Password fields didn't match.")}
+                _("Password must be at least 8 characters long.")
             )
-        return data
+        if not any(c.isupper() for c in value):
+            raise serializers.ValidationError(
+                _("Password must contain at least one uppercase letter.")
+            )
+        if not any(c.islower() for c in value):
+            raise serializers.ValidationError(
+                _("Password must contain at least one lowercase letter.")
+            )
+        if not any(c.isdigit() for c in value):
+            raise serializers.ValidationError(
+                _("Password must contain at least one digit.")
+            )
+        if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in value):
+            raise serializers.ValidationError(
+                _(
+                    "Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)."  # noqa E501
+                )
+            )
+        return value
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -73,7 +87,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        validated_data.pop("password2")
         password = validated_data.pop("password")
         user = User.objects.create_user(**validated_data)
         user.set_password(password)

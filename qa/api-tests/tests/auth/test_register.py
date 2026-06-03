@@ -10,7 +10,6 @@ VALID_PAYLOAD = {
     "email": "john@example.com",
     "username": "johndoe",
     "password": "SecurePass123!",
-    "password2": "SecurePass123!",
     "first_name": "John",
     "last_name": "Doe",
 }
@@ -58,7 +57,6 @@ class TestRegisterSuccess:
         response = self.client.post(REGISTER_URL, VALID_PAYLOAD, format="json")
         assert "password" not in response.data
         assert "password" not in response.data.get("user", {})
-        assert "password2" not in response.data
 
     def test_register_creates_user_in_db(self):
         self.client.post(REGISTER_URL, VALID_PAYLOAD, format="json")
@@ -105,11 +103,6 @@ class TestRegisterValidation:
         response = self.client.post(REGISTER_URL, payload, format="json")
         assert response.status_code == 400
 
-    def test_passwords_mismatch_returns_400(self):
-        payload = {**VALID_PAYLOAD, "password2": "DifferentPass!"}
-        response = self.client.post(REGISTER_URL, payload, format="json")
-        assert response.status_code == 400
-
     def test_missing_first_name_returns_400(self):
         payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "first_name"}
         response = self.client.post(REGISTER_URL, payload, format="json")
@@ -135,11 +128,6 @@ class TestRegisterValidation:
         response = self.client.post(REGISTER_URL, payload, format="json")
         assert response.status_code == 400
 
-    def test_missing_password2_returns_400(self):
-        payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "password2"}
-        response = self.client.post(REGISTER_URL, payload, format="json")
-        assert response.status_code == 400
-
     def test_invalid_email_format_returns_400(self):
         payload = {**VALID_PAYLOAD, "email": "not-a-valid-email"}
         response = self.client.post(REGISTER_URL, payload, format="json")
@@ -162,7 +150,32 @@ class TestRegisterValidation:
         self.client.post(REGISTER_URL, payload, format="json")
         assert User.objects.filter(email="existing@example.com").count() == 1
 
-    def test_passwords_mismatch_does_not_create_user(self):
-        payload = {**VALID_PAYLOAD, "password2": "DifferentPass!"}
+    def test_password_too_short_returns_400(self):
+        payload = {**VALID_PAYLOAD, "password": "Ab1!"}
+        response = self.client.post(REGISTER_URL, payload, format="json")
+        assert response.status_code == 400
+
+    def test_password_no_uppercase_returns_400(self):
+        payload = {**VALID_PAYLOAD, "password": "securepass123!"}
+        response = self.client.post(REGISTER_URL, payload, format="json")
+        assert response.status_code == 400
+
+    def test_password_no_lowercase_returns_400(self):
+        payload = {**VALID_PAYLOAD, "password": "SECUREPASS123!"}
+        response = self.client.post(REGISTER_URL, payload, format="json")
+        assert response.status_code == 400
+
+    def test_password_no_digit_returns_400(self):
+        payload = {**VALID_PAYLOAD, "password": "SecurePass!!!"}
+        response = self.client.post(REGISTER_URL, payload, format="json")
+        assert response.status_code == 400
+
+    def test_password_no_special_char_returns_400(self):
+        payload = {**VALID_PAYLOAD, "password": "SecurePass123"}
+        response = self.client.post(REGISTER_URL, payload, format="json")
+        assert response.status_code == 400
+
+    def test_weak_password_does_not_create_user(self):
+        payload = {**VALID_PAYLOAD, "password": "password"}
         self.client.post(REGISTER_URL, payload, format="json")
         assert User.objects.filter(email=VALID_PAYLOAD["email"]).exists() is False
