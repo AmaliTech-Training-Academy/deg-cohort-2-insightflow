@@ -1,0 +1,39 @@
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+skip = ["migrations"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+explicit_package_bases = true
+exclude = [
+    "migrations/",
+    "\\.venv/",
+    "venv/",
+    "data_eng/",
+    "qa/data-engineering/conftest\\.py",
+    "qa/api-tests/conftest\\.py",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "qa"]
+skips = ["B101"]  # allow assert in non-test code
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "insightflow.settings.dev"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
