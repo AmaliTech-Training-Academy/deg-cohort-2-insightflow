@@ -6,12 +6,9 @@ name: Deploy → Dev
 # Keep both files identical. Edit here, then copy to .github/workflows/.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Triggers only after CI passes on dev.
-# This guarantees every deploy has survived lint, tests, and security scans.
+# Triggers on every push to dev (PRs must pass CI before merge via branch protection).
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
     branches: [dev]
 
 concurrency:
@@ -31,25 +28,14 @@ env:
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ── Guard ────────────────────────────────────────────────────────────────────
-  ci-gate:
-    name: CI gate
-    runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    steps:
-      - run: echo "CI passed on ${{ github.event.workflow_run.head_sha }} — starting dev deploy"
-
   # ── Deploy ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2 (dev)
     runs-on: ubuntu-latest
-    needs: ci-gate
     environment: dev
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -60,9 +46,6 @@ jobs:
       - name: Make SSM helper executable
         run: chmod +x "${{ env.SSM_WAIT }}"
 
-      # Helper: base64-encode a local file and build the SSM parameters JSON.
-      # Usage:  ssm_upload <local-file> <remote-path>
-      # Output: writes /tmp/ssm-params.json then sends the command and waits.
       - name: Upload docker-compose, env config, and deploy script
         env:
           INSTANCE: ${{ secrets.DEV_EC2_INSTANCE_ID }}
@@ -91,7 +74,6 @@ jobs:
           ssm_upload "${{ env.ENV_CONFIG }}"     /tmp/deploy.env                     30
           ssm_upload "${{ env.DEPLOY_SCRIPT }}"  /tmp/deploy.sh                      30
 
-          # Make deploy script executable on the instance
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE" \
             --document-name "AWS-RunShellScript" \
@@ -104,7 +86,7 @@ jobs:
         id: ssm_deploy
         env:
           INSTANCE:   ${{ secrets.DEV_EC2_INSTANCE_ID }}
-          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          COMMIT_SHA: ${{ github.sha }}
           REPO_URL:   https://github.com/${{ github.repository }}.git
         run: |
           TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2)
@@ -128,7 +110,7 @@ jobs:
           echo "SSM Command ID: $CMD_ID"
           "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" "$TIMEOUT"
 
-      # End-to-end validation through the ALB (proves DNS + TG + container)
+      # End-to-end validation through the ALB
       - name: Smoke test via ALB
         run: |
           ALB="${{ secrets.DEV_ALB_DNS_NAME }}"
@@ -167,9 +149,10 @@ jobs:
 
           | Field       | Value |
           |-------------|-------|
-          | **Commit**  | \`${{ github.event.workflow_run.head_sha }}\` |
+          | **Commit**  | \`${{ github.sha }}\` |
           | **Branch**  | \`dev\` |
+          | **Pushed by** | ${{ github.actor }} |
           | **Build**   | on EC2 — no container registry |
-          | **CI run**  | [#${{ github.event.workflow_run.id }}](${{ github.event.workflow_run.html_url }}) |
+          | **Run**     | [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
           | **ALB**     | http://${{ secrets.DEV_ALB_DNS_NAME }} |
           EOF
