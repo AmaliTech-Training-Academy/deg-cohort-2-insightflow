@@ -185,6 +185,9 @@ $COMPOSE up -d --no-deps --remove-orphans frontend
 log "Rolling-replacing etl..."
 $COMPOSE up -d --no-deps --remove-orphans etl
 
+log "Rolling-replacing etl-listener and etl-worker..."
+$COMPOSE up -d --no-deps --remove-orphans etl-listener etl-worker
+
 # ── 6. Post-deploy health check ───────────────────────────────────────────────
 # Allow extra time on first deploy — migrations + seed_data can take several minutes.
 log "Post-deploy health check (port 8080)..."
@@ -204,7 +207,7 @@ if [[ "$LIVE_OK" != "true" ]]; then
   grep -v '^DEPLOY_TAG=' "$APP_ENV_FILE" > "$TMP"
   echo "DEPLOY_TAG=${PREV_TAG}" >> "$TMP"
   mv "$TMP" "$APP_ENV_FILE"
-  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend
+  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend etl-listener etl-worker
   sleep 15
   RB_HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
             "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
