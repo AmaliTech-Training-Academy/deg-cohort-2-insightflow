@@ -1,69 +1,58 @@
-"""Create Star Schema for InsightFlow Retail Analytics"""
+"""
+Create the insightflow_star_schema on the target warehouse database.
+
+Reads DDL from warehouse/schema.sql and executes every statement against
+the warehouse connection configured via environment variables.  Safe to run
+multiple times (all statements use IF NOT EXISTS).
+"""
+
+import logging
+import re
+from pathlib import Path
 
 from config import DATABASE_URL
 from sqlalchemy import create_engine, text
 
-engine = create_engine(DATABASE_URL)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+log = logging.getLogger(__name__)
 
-SCHEMA_SQL = """
--- Dimension: Date
-CREATE TABLE IF NOT EXISTS dim_date (
-    date_key SERIAL PRIMARY KEY,
-    full_date DATE UNIQUE NOT NULL,
-    year INTEGER, quarter INTEGER, month INTEGER,
-    day INTEGER, day_of_week INTEGER, week_of_year INTEGER,
-    month_name VARCHAR(20), day_name VARCHAR(20),
-    is_weekend BOOLEAN
-);
-
--- Dimension: Product
-CREATE TABLE IF NOT EXISTS dim_product (
-    product_key SERIAL PRIMARY KEY,
-    product_name VARCHAR(255) NOT NULL,
-    category VARCHAR(100),
-    unit_price NUMERIC(10,2)
-);
-
--- Dimension: Customer
-CREATE TABLE IF NOT EXISTS dim_customer (
-    customer_key SERIAL PRIMARY KEY,
-    customer_id INTEGER UNIQUE NOT NULL,
-    segment VARCHAR(50)
-);
-
--- Dimension: Region
-CREATE TABLE IF NOT EXISTS dim_region (
-    region_key SERIAL PRIMARY KEY,
-    region_name VARCHAR(255) NOT NULL,
-    country VARCHAR(100)
-);
-
--- Fact: Sales
-CREATE TABLE IF NOT EXISTS fact_sales (
-    sale_key SERIAL PRIMARY KEY,
-    date_key INTEGER REFERENCES dim_date(date_key),
-    product_key INTEGER REFERENCES dim_product(product_key),
-    customer_key INTEGER REFERENCES dim_customer(customer_key),
-    region_key INTEGER REFERENCES dim_region(region_key),
-    quantity INTEGER,
-    unit_price NUMERIC(10,2),
-    total_amount NUMERIC(12,2),
-    source VARCHAR(50)
-);
-
--- TODO: Add fact_feedback table for customer satisfaction analytics
--- TODO: Add dim_channel for online vs in-store tracking
-"""
+SCHEMA_FILE = Path(__file__).parent / "warehouse" / "schema.sql"
 
 
-def create_schema():
-    with engine.connect() as conn:
-        for stmt in SCHEMA_SQL.split(";"):
-            stmt = stmt.strip()
-            if stmt and not stmt.startswith("--"):
-                conn.execute(text(stmt))
-        conn.commit()
-    print("Star schema created successfully!")
+def _parse_sql(sql: str) -> list[str]:
+    """Split a SQL file into individual executable statements.
+
+    Strips single-line (--) and block (/* */) comments before splitting on
+    statement-terminating semicolons so comment content cannot fool the
+    splitter.
+    """
+    # Remove block comments
+    sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
+    # Remove single-line comments (but keep newlines to preserve line counts)
+    sql = re.sub(r"--[^\n]*", "", sql)
+    statements = [s.strip() for s in sql.split(";")]
+    return [s for s in statements if s]
+
+
+def create_schema(database_url: str = DATABASE_URL) -> None:
+    """Create all star-schema tables and indexes in the warehouse database."""
+    log.info("Connecting to warehouse: %s", database_url.split("@")[-1])
+
+    raw_sql = SCHEMA_FILE.read_text(encoding="utf-8")
+    statements = _parse_sql(raw_sql)
+
+    engine = create_engine(database_url, echo=False)
+    created = 0
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+            first_line = stmt.splitlines()[0][:80]
+            log.info("  ✓  %s …", first_line)
+            created += 1
+
+    log.info("Star schema ready — %d statements executed.", created)
+    engine.dispose()
 
 
 if __name__ == "__main__":

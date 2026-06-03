@@ -6,7 +6,7 @@ Endpoint base: /api/ingestion/pos/
 """
 
 import io
-import pytest
+# import pytest
 import requests
 
 
