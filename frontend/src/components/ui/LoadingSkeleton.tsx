@@ -9,7 +9,7 @@ export function LoadingSkeleton({ rows = 4, className = "" }: LoadingSkeletonPro
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="h-4 rounded bg-gray-200 animate-pulse"
+          className="h-4 rounded bg-gray-200 dark:bg-slate-700 animate-pulse"
           style={{ width: `${85 - (i % 3) * 10}%` }}
         />
       ))}

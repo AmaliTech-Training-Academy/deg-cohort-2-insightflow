@@ -1,18 +1,40 @@
 @import "tailwindcss";
 
+/*
+  In Tailwind v4, @custom-variant redefines the built-in `dark:` variant
+  to use the .dark class on <html> (added by next-themes) instead of
+  the default prefers-color-scheme media query.
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Light tokens ──────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg:         #f9fafb;
+  --surface:    #ffffff;
+  --border:     #e5e7eb;
+  --text:       #111827;
+  --text-muted: #6b7280;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Dark tokens ───────────────────────────────────────────── */
+.dark {
+  --bg:         #0f172a;
+  --surface:    #1e293b;
+  --border:     #334155;
+  --text:       #f1f5f9;
+  --text-muted: #94a3b8;
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Always keep form fields readable regardless of theme */
+input,
+textarea,
+select {
+  color: var(--text);
+  background-color: var(--surface);
 }

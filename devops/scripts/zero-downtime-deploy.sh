@@ -107,7 +107,7 @@ fi
 cd "$REPO_DIR"
 log "Fetching origin..."
 git "${GIT_OPTS[@]}" fetch --quiet origin
-git checkout --quiet --detach "$COMMIT_SHA"
+git checkout -f --quiet --detach "$COMMIT_SHA"
 log "Checked out ${COMMIT_SHA}"
 
 # ── 3. Build new images ───────────────────────────────────────────────────────
@@ -119,6 +119,24 @@ DEPLOY_TAG="$DEPLOY_TAG" $COMPOSE build \
 log "Build complete"
 
 # ── 4. Canary pre-flight ──────────────────────────────────────────────────────
+# Ensure the compose network exists with the correct Compose-managed labels.
+# If it exists without labels (manually created), remove and recreate it.
+EXISTING_NET=$(docker network ls --filter "name=^${PROJECT}_default$" --format "{{.ID}}" 2>/dev/null)
+if [[ -n "$EXISTING_NET" ]]; then
+  NET_LABEL=$(docker network inspect "$EXISTING_NET" \
+    --format '{{index .Labels "com.docker.compose.network"}}' 2>/dev/null)
+  if [[ "$NET_LABEL" != "default" ]]; then
+    log "Removing unmanaged network ${PROJECT}_default to let Compose recreate it"
+    docker network rm "$EXISTING_NET" 2>/dev/null || true
+  fi
+fi
+COMPOSE_VER=$(docker compose version --short 2>/dev/null || echo "")
+docker network create \
+  --label "com.docker.compose.network=default" \
+  --label "com.docker.compose.project=${PROJECT}" \
+  --label "com.docker.compose.version=${COMPOSE_VER}" \
+  "${PROJECT}_default" 2>/dev/null || true
+
 log "Starting canary on port ${CANARY_PORT}..."
 docker rm -f insightflow-canary 2>/dev/null || true
 
@@ -167,13 +185,17 @@ $COMPOSE up -d --no-deps --remove-orphans frontend
 log "Rolling-replacing etl..."
 $COMPOSE up -d --no-deps --remove-orphans etl
 
+log "Rolling-replacing etl-listener and etl-worker..."
+$COMPOSE up -d --no-deps --remove-orphans etl-listener etl-worker
+
 # ── 6. Post-deploy health check ───────────────────────────────────────────────
+# Allow extra time on first deploy — migrations + seed_data can take several minutes.
 log "Post-deploy health check (port 8080)..."
 LIVE_OK=false
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
          "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
-  log "  live [$i/30] HTTP ${HTTP}"
+  log "  live [$i/60] HTTP ${HTTP}"
   if [[ "$HTTP" == "200" ]]; then LIVE_OK=true; break; fi
   sleep "$HC_INTERVAL"
 done
@@ -185,7 +207,7 @@ if [[ "$LIVE_OK" != "true" ]]; then
   grep -v '^DEPLOY_TAG=' "$APP_ENV_FILE" > "$TMP"
   echo "DEPLOY_TAG=${PREV_TAG}" >> "$TMP"
   mv "$TMP" "$APP_ENV_FILE"
-  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend
+  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend etl-listener etl-worker
   sleep 15
   RB_HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
             "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
