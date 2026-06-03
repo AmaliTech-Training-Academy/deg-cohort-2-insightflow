@@ -11,7 +11,7 @@ def load_dotenv(env_path: Optional[Path] = None) -> None:
     Supports ${VAR} expansion inside values. Defaults to <project-root>/.env.
     """
     if env_path is None:
-        env_path = Path(__file__).resolve().parents[1] / ".env"
+        env_path = Path(__file__).resolve().parents[2] / ".env"
     if not env_path.exists():
         return
     for line in env_path.read_text(encoding="utf-8").splitlines():
@@ -45,11 +45,11 @@ MB_ADMIN_EMAIL = os.getenv("METABASE_ADMIN_EMAIL")
 MB_ADMIN_PASSWORD = required_env("METABASE_ADMIN_PASSWORD")
 
 PG_CONFIG = {
-    "host": os.getenv("PG_HOST"),
-    "port": int(os.getenv("PG_PORT", 5437)),
-    "dbname": os.getenv("PG_DATABASE"),
-    "user": os.getenv("PG_USER"),
-    "password": required_env("PG_PASSWORD"),
+    "host": os.getenv("WAREHOUSE_DB_HOST"),
+    "port": int(os.getenv("WAREHOUSE_DB_PORT", 5432)),
+    "dbname": os.getenv("WAREHOUSE_DB_NAME"),
+    "user": os.getenv("WAREHOUSE_DB_USER"),
+    "password": required_env("WAREHOUSE_DB_PASSWORD"),
 }
 
 METABASE_DB_CONFIG = {
