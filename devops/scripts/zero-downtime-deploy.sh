@@ -154,6 +154,9 @@ mv "$TMP" "$APP_ENV_FILE"
 log "Rolling-replacing backend..."
 $COMPOSE up -d --no-deps --remove-orphans backend
 
+log "Rolling-replacing celery-worker..."
+$COMPOSE up -d --no-deps --remove-orphans celery-worker
+
 log "Rolling-replacing frontend..."
 $COMPOSE up -d --no-deps --remove-orphans frontend
 
@@ -178,7 +181,7 @@ if [[ "$LIVE_OK" != "true" ]]; then
   grep -v '^DEPLOY_TAG=' "$APP_ENV_FILE" > "$TMP"
   echo "DEPLOY_TAG=${PREV_TAG}" >> "$TMP"
   mv "$TMP" "$APP_ENV_FILE"
-  $COMPOSE up -d --no-deps --remove-orphans backend frontend
+  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend
   sleep 15
   RB_HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
             "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
