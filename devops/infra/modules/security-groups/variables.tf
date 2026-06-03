@@ -18,6 +18,19 @@ variable "enable_ssh" {
   default     = false
 }
 
+
+variable "allow_public_db_access" {
+  description = "Open RDS port 5432 to the internet. Dev only — lets developers connect directly with just the endpoint URL."
+  type        = bool
+  default     = false
+}
+
+variable "db_public_cidr_blocks" {
+  description = "CIDRs allowed to reach RDS directly. Only used when allow_public_db_access = true."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 variable "ssh_cidr_blocks" {
   description = "CIDRs allowed to SSH into EC2. Only used when enable_ssh = true."
   type        = list(string)

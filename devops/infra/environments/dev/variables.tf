@@ -12,3 +12,9 @@ variable "warehouse_db_password" {
   type      = string
   sensitive = true
 }
+
+variable "developer_usernames" {
+  description = "List of IAM usernames to create for dev tunnel access. e.g. [\"ssozi\", \"okeke\"]"
+  type        = list(string)
+  default     = []
+}

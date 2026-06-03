@@ -1,0 +1,10 @@
+{
+  "name": "insightflow-frontend-unit-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Unit tests for the InsightFlow frontend. Run via the frontend Vitest runner — see README.",
+  "scripts": {
+    "test": "cd ../../../frontend && npm test",
+    "test:watch": "cd ../../../frontend && npm run test:watch"
+  }
+}
