@@ -1,4 +1,3 @@
-## Build artifacts
 target/
 *.class
 *.jar
@@ -27,6 +26,7 @@ venv/
 
 ## Env & secrets
 .env
+.env.example
 .env.local
 .env.*.local
 
