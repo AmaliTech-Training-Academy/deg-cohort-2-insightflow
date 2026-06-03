@@ -2,9 +2,10 @@
 
 import logging
 import re
-import requests
 import time
-from config import METABASE_DB_CONFIG, MB_ADMIN_EMAIL, MB_ADMIN_PASSWORD, METABASE_URL
+
+import requests
+from config import MB_ADMIN_EMAIL, MB_ADMIN_PASSWORD, METABASE_DB_CONFIG, METABASE_URL
 
 # ----------------------------
 # Logging configuration
@@ -17,6 +18,7 @@ logging.basicConfig(
 # Shared session object
 _session = requests.Session()
 _session.headers.update({"Content-Type": "application/json"})
+
 
 # ----------------------------
 # Wait for Metabase
@@ -33,6 +35,7 @@ def wait_for_metabase(retries=30, interval=5):
             pass
         time.sleep(interval)
     raise RuntimeError("Metabase did not become ready in time.")
+
 
 # ----------------------------
 # Initial setup (fresh install)
@@ -75,6 +78,7 @@ def login():
     logger.info("Login successful.")
     return session_id
 
+
 # ----------------------------
 # Connect or create database
 # ----------------------------
@@ -86,9 +90,7 @@ def get_or_create_database(session_id):
     r = _session.get(f"{METABASE_URL}/api/database", headers=headers, timeout=10)
     r.raise_for_status()
     response = r.json()
-    db_list = (
-        response.get("data", response) if isinstance(response, dict) else response
-    )
+    db_list = response.get("data", response) if isinstance(response, dict) else response
 
     for db in db_list:
         if db.get("name") == target_name:
@@ -109,6 +111,7 @@ def get_or_create_database(session_id):
     logger.info(f"Registered database '{target_name}' (ID: {db_id})")
     return db_id
 
+
 # ----------------------------
 # Cleanup dashboards and cards
 # ----------------------------
@@ -127,6 +130,7 @@ def clean_up(session_id):
                 timeout=10,
             )
     logger.info("Cleaned up old dashboards and cards.")
+
 
 # ----------------------------
 # Build tabbed dashboard
@@ -154,7 +158,7 @@ def build_tabbed_dashboard(
         )
 
     # 2. Create all cards first, tracking which tab each belongs to
-    mb_tabs = []       # tab definitions with temporary negative IDs
+    mb_tabs = []  # tab definitions with temporary negative IDs
     all_dashcards = []
     card_index = 0
 
@@ -191,18 +195,20 @@ def build_tabbed_dashboard(
                 continue
             card_index += 1
             tab_card_count += 1
-            all_dashcards.append({
-                "id": -card_index,
-                "card_id": r.json()["id"],
-                "dashboard_tab_id": tab_temp_id,
-                "col": card_def.get("col", 0),
-                "row": card_def.get("row", 0),
-                "size_x": card_def.get("size_x", 6),
-                "size_y": card_def.get("size_y", 4),
-                "series": [],
-                "parameter_mappings": [],
-                "visualization_settings": {},
-            })
+            all_dashcards.append(
+                {
+                    "id": -card_index,
+                    "card_id": r.json()["id"],
+                    "dashboard_tab_id": tab_temp_id,
+                    "col": card_def.get("col", 0),
+                    "row": card_def.get("row", 0),
+                    "size_x": card_def.get("size_x", 6),
+                    "size_y": card_def.get("size_y", 4),
+                    "series": [],
+                    "parameter_mappings": [],
+                    "visualization_settings": {},
+                }
+            )
         logger.info(f"Tab '{tab_name}' — {tab_card_count} cards created.")
 
     # 3. Attach tabs + dashcards + filters in a single PUT
@@ -214,14 +220,16 @@ def build_tabbed_dashboard(
         "number/=": "number",
     }
     mb_params = []
-    for p in (parameters or []):
-        mb_params.append({
-            "id":        p["id"],
-            "name":      p["name"],
-            "type":      p["type"],
-            "slug":      p["id"].replace("p_", ""),
-            "sectionId": _section_map.get(p["type"], "string"),
-        })
+    for p in parameters or []:
+        mb_params.append(
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "type": p["type"],
+                "slug": p["id"].replace("p_", ""),
+                "sectionId": _section_map.get(p["type"], "string"),
+            }
+        )
 
     r = _session.put(
         f"{METABASE_URL}/api/dashboard/{dashboard_id}",
@@ -241,6 +249,7 @@ def build_tabbed_dashboard(
         f" and {card_index} cards. ID: {dashboard_id}"
     )
     return dashboard_id
+
 
 # ----------------------------
 # Set dashboard as homepage
@@ -280,7 +289,10 @@ def create_filter_value_cards(session_id, db_id):
         {
             "key": "country_values",
             "name": "Country Filter",
-            "sql": "SELECT DISTINCT country FROM v_country_comparison ORDER BY country;",
+            "sql": (
+                "SELECT DISTINCT country FROM v_country_comparison"
+                " ORDER BY country;"
+            ),
         },
         {
             "key": "region_values",
@@ -309,7 +321,7 @@ def create_filter_value_cards(session_id, db_id):
                 "native": {"query": fvc["sql"]},
                 "database": db_id,
             },
-            "visualization_settings": {}
+            "visualization_settings": {},
         }
         r = _session.post(
             f"{METABASE_URL}/api/card", json=payload, headers=headers, timeout=10

@@ -28,8 +28,7 @@ TAB1_CARDS = [
         "name": "Unique Customers",
         "display": "scalar",
         "sql": (
-            "SELECT COALESCE(unique_customers, 0)"
-            ' AS "Customers" FROM v_kpi_summary;'
+            "SELECT COALESCE(unique_customers, 0)" ' AS "Customers" FROM v_kpi_summary;'
         ),
         "col": 12,
         "row": 0,

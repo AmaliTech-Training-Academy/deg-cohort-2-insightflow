@@ -1,37 +1,41 @@
 # metabase_setup.py
 
 import logging
+
 import psycopg2
 from config import METABASE_URL, PG_CONFIG
-from metabase_client import (
-    wait_for_metabase,
-    setup_metabase,
-    login,
-    get_or_create_database,
-    clean_up,
-    build_tabbed_dashboard,
-    create_filter_value_cards,
-    set_homepage,
-)
-
-# Import SQL views for each tab
-from sales.views import VIEWS_SQL as SALES_VIEWS
-from products.views import VIEWS_SQL as PRODUCTS_VIEWS
-from regional.views import VIEWS_SQL as REGIONAL_VIEWS
+from customer.cards import TAB4_CARDS
 from customer.views import VIEWS_SQL as CUSTOMER_VIEWS
+from metabase_client import (
+    build_tabbed_dashboard,
+    clean_up,
+    create_filter_value_cards,
+    get_or_create_database,
+    login,
+    set_homepage,
+    setup_metabase,
+    wait_for_metabase,
+)
 
 # Import cards for each tab
 from overview.cards import TAB0_CARDS
-from sales.cards import TAB1_CARDS
 from products.cards import TAB2_CARDS
+from products.views import VIEWS_SQL as PRODUCTS_VIEWS
 from regional.cards import TAB3_CARDS
-from customer.cards import TAB4_CARDS
+from regional.views import VIEWS_SQL as REGIONAL_VIEWS
+from sales.cards import TAB1_CARDS
+
+# Import SQL views for each tab
+from sales.views import VIEWS_SQL as SALES_VIEWS
 
 # ----------------------------
 # Logging configuration
 # ----------------------------
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("InsightFlowDashboard")
+
 
 # ----------------------------
 # Helper: create SQL views
@@ -47,12 +51,18 @@ def create_views(*views_list):
                     statement = statement.strip()
                     if statement:
                         try:
-                            view_name = next((w for w in statement.split() if w.startswith("v_")), "?")
+                            view_name = next(
+                                (w for w in statement.split() if w.startswith("v_")),
+                                "?",
+                            )
                             cur.execute(f"DROP VIEW IF EXISTS {view_name} CASCADE;")
                             cur.execute(statement + ";")
                             logger.info(f"[OK] Created view: {view_name}")
                         except Exception as e:
-                            logger.warning(f"[WARN] Failed to create view {view_name}: {e}")
+                            logger.warning(
+                                f"[WARN] Failed to create view {view_name}: {e}"
+                            )
+
 
 # ----------------------------
 # Main orchestration
@@ -97,13 +107,16 @@ def main():
         ("Regional Analysis", TAB3_CARDS),
         ("Customer Intelligence", TAB4_CARDS),
     ]
-    dashboard_id = build_tabbed_dashboard(session_id, database_id, tabs, parameters=all_params)
+    dashboard_id = build_tabbed_dashboard(
+        session_id, database_id, tabs, parameters=all_params
+    )
 
     # Set as homepage so users land on the dashboard after login
     set_homepage(session_id, dashboard_id)
 
     logger.info("InsightFlow Analytics dashboard created successfully!")
     logger.info("Access it at: %s/dashboard/%s", METABASE_URL, dashboard_id)
+
 
 # ----------------------------
 # Entry point

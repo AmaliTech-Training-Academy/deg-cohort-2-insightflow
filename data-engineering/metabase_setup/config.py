@@ -48,16 +48,16 @@ def _required_env(*names):
 load_dotenv()
 
 # Metabase connection
-METABASE_URL      = os.getenv("METABASE_URL", "http://localhost:3001")
-MB_ADMIN_EMAIL    = os.getenv("METABASE_ADMIN_EMAIL")
+METABASE_URL = os.getenv("METABASE_URL", "http://localhost:3001")
+MB_ADMIN_EMAIL = os.getenv("METABASE_ADMIN_EMAIL")
 MB_ADMIN_PASSWORD = _required_env("METABASE_ADMIN_PASSWORD")
 
 # psycopg2 connection used by the setup script to create SQL views
 PG_CONFIG = {
-    "host":     _env("PG_HOST",      "WAREHOUSE_DB_HOST"),
+    "host": _env("PG_HOST", "WAREHOUSE_DB_HOST"),
     "port": int(_env("PG_PORT", "WAREHOUSE_DB_PORT", default="5432")),
-    "dbname":   _env("PG_DATABASE",  "WAREHOUSE_DB_NAME"),
-    "user":     _env("PG_USER",      "WAREHOUSE_DB_USER"),
+    "dbname": _env("PG_DATABASE", "WAREHOUSE_DB_NAME"),
+    "user": _env("PG_USER", "WAREHOUSE_DB_USER"),
     "password": _required_env("PG_PASSWORD", "WAREHOUSE_DB_PASSWORD"),
 }
 
@@ -67,12 +67,10 @@ METABASE_DB_CONFIG = {
     "engine": "postgres",
     "name": _env("METABASE_DB_NAME", default="InsightFlow Warehouse"),
     "details": {
-        "host":     _env("METABASE_DB_HOST",     "WAREHOUSE_DB_HOST"),
-        "port": int(
-            _env("METABASE_DB_PORT", "WAREHOUSE_DB_PORT", default="5432")
-        ),
-        "dbname":   _env("METABASE_DB_DATABASE", "WAREHOUSE_DB_NAME"),
-        "user":     _env("METABASE_DB_USER",     "WAREHOUSE_DB_USER"),
+        "host": _env("METABASE_DB_HOST", "WAREHOUSE_DB_HOST"),
+        "port": int(_env("METABASE_DB_PORT", "WAREHOUSE_DB_PORT", default="5432")),
+        "dbname": _env("METABASE_DB_DATABASE", "WAREHOUSE_DB_NAME"),
+        "user": _env("METABASE_DB_USER", "WAREHOUSE_DB_USER"),
         "password": _env("METABASE_DB_PASSWORD", "WAREHOUSE_DB_PASSWORD"),
         "ssl": False,
     },
