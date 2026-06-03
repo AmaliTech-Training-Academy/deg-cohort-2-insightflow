@@ -5,7 +5,6 @@ import time
 from typing import Callable, Optional
 
 import requests
-
 from config import MB_ADMIN_EMAIL, MB_ADMIN_PASSWORD, METABASE_DB_CONFIG, METABASE_URL
 
 log = logging.getLogger("insightflow")
@@ -34,7 +33,12 @@ def wait_for_metabase() -> None:
     log.info("Waiting for Metabase...")
     for _ in range(30):
         try:
-            if _session.get(f"{METABASE_URL}/api/health", timeout=REQUEST_TIMEOUT).status_code == 200:
+            if (
+                _session.get(
+                    f"{METABASE_URL}/api/health", timeout=REQUEST_TIMEOUT
+                ).status_code
+                == 200
+            ):
                 log.info("Metabase is ready.")
                 return
         except requests.exceptions.RequestException:
@@ -98,11 +102,17 @@ def clean_up(session_id: str) -> None:
     headers = {"X-Metabase-Session": session_id}
 
     existing_cards = (
-        _session.get(f"{METABASE_URL}/api/card", headers=headers, timeout=REQUEST_TIMEOUT).json()
+        _session.get(
+            f"{METABASE_URL}/api/card", headers=headers, timeout=REQUEST_TIMEOUT
+        ).json()
         or []
     )
     for card in existing_cards:
-        _session.delete(f"{METABASE_URL}/api/card/{card['id']}", headers=headers, timeout=REQUEST_TIMEOUT)
+        _session.delete(
+            f"{METABASE_URL}/api/card/{card['id']}",
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
     if existing_cards:
         log.info("Removed %d old card(s).", len(existing_cards))
 
@@ -166,22 +176,26 @@ def build_dashboard(session_id: str, database_id: int, cards: list[dict]) -> int
             },
         )
         if card_response.status_code not in (200, 202):
-            log.warning("  [WARN] %s (%s)", card_definition["name"], card_response.status_code)
+            log.warning(
+                "  [WARN] %s (%s)", card_definition["name"], card_response.status_code
+            )
             continue
 
         card_id = int(card_response.json()["id"])
         filter_fn: Optional[Callable[[int], list]] = card_definition.get("filters")
-        dashcards.append({
-            "id": -card_index,
-            "card_id": card_id,
-            "dashboard_tab_id": tab_id,
-            "col": card_definition["col"],
-            "row": card_definition["row"],
-            "size_x": card_definition["size_x"],
-            "size_y": card_definition["size_y"],
-            "visualization_settings": card_definition.get("viz", {}),
-            "parameter_mappings": filter_fn(card_id) if filter_fn else [],
-        })
+        dashcards.append(
+            {
+                "id": -card_index,
+                "card_id": card_id,
+                "dashboard_tab_id": tab_id,
+                "col": card_definition["col"],
+                "row": card_definition["row"],
+                "size_x": card_definition["size_x"],
+                "size_y": card_definition["size_y"],
+                "visualization_settings": card_definition.get("viz", {}),
+                "parameter_mappings": filter_fn(card_id) if filter_fn else [],
+            }
+        )
         log.info("  [OK] %s", card_definition["name"])
 
     placed = (

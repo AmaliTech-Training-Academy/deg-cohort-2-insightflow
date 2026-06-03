@@ -46,12 +46,15 @@ repos:
   # but excluded here because qa/data-engineering/conftest.py and
   # qa/api-tests/conftest.py share the same module name and hyphenated
   # directory names cannot form valid Python package paths for mypy.
+  # data-engineering/metabase_setup/ is excluded for the same reason: its
+  # scripts use bare imports resolved via sys.path at runtime (not as a
+  # package), so mypy cannot resolve them correctly from the project root.
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.10.0
     hooks:
       - id: mypy
         files: ^(backend|data-engineering|qa)/
-        exclude: ^qa/
+        exclude: ^(qa/|data-engineering/metabase_setup/)
         args: ["--config-file", "pyproject.toml"]
         additional_dependencies:
           - types-requests

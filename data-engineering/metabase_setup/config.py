@@ -30,7 +30,7 @@ load_dotenv()
 
 
 def required_env(name: str) -> str:
-    """Return the value of a required environment variable, or raise EnvironmentError."""
+    """Return the named env variable, or raise EnvironmentError if unset."""
     value = os.getenv(name)
     if value is None:
         raise EnvironmentError(

@@ -1,7 +1,7 @@
 # sales_dashboard_cards.py
 # Chart colours
-COLOUR_BLUE = "#1A56DB" 
-COLOUR_BLUE_LIGHT = "#3B82F6"  
+COLOUR_BLUE = "#1A56DB"
+COLOUR_BLUE_LIGHT = "#3B82F6"
 
 # Optional date-range filter injected into time-series queries via template tags
 DATE_FILTER_SNIPPET = (
@@ -45,23 +45,23 @@ def date_parameter_mapping(card_id: int) -> list:
     ]
 
 
-_daily_sql = (  # nosec B608
-    'SELECT date, daily_revenue AS "Revenue (GHS)" '
+_daily_sql = (
+    'SELECT date, daily_revenue AS "Revenue (GHS)" '  # nosec B608
     "FROM v_daily_revenue WHERE 1=1 "
     + DATE_FILTER_SNIPPET.format(col="date")
     + " ORDER BY date;"
 )
 
-_monthly_sql = (  # nosec B608
-    "SELECT TO_CHAR(month_start,'Mon YYYY') AS \"Month\","
+_monthly_sql = (
+    "SELECT TO_CHAR(month_start,'Mon YYYY') AS \"Month\","  # nosec B608
     'monthly_revenue AS "Revenue (GHS)" FROM v_monthly_revenue '
     "WHERE month_start < DATE_TRUNC('month', CURRENT_DATE) "
     + DATE_FILTER_SNIPPET.format(col="month_start")
     + " ORDER BY month_start;"
 )
 
-_weekly_sql = (  # nosec B608
-    'SELECT week_start AS "Week Start", week_end AS "Week End", '
+_weekly_sql = (
+    'SELECT week_start AS "Week Start", week_end AS "Week End", '  # nosec B608
     'weekly_revenue AS "Revenue (GHS)", transactions AS "Transactions", '
     'unique_customers AS "Unique Customers", units_sold AS "Units Sold", '
     'avg_order_value AS "Avg Order (GHS)" FROM v_weekly_summary WHERE 1=1 '
@@ -74,14 +74,20 @@ CARDS: list[dict] = [
     {
         "name": "Sales – Total Revenue",
         "display": "scalar",
-        "sql": 'SELECT ROUND(total_revenue,2) AS "Total Revenue (GHS)" FROM v_kpi_summary;',
+        "sql": (
+            'SELECT ROUND(total_revenue,2) AS "Total Revenue (GHS)"'
+            " FROM v_kpi_summary;"
+        ),
         "viz": {
             "card.title": "Total Revenue",
             "card.description": "All-time cumulative revenue",
             "scalar.decimals": 2,
             "column_settings": ghs_column_settings("Total Revenue (GHS)"),
         },
-        "col": 0, "row": 0, "size_x": 5, "size_y": 5,
+        "col": 0,
+        "row": 0,
+        "size_x": 5,
+        "size_y": 5,
     },
     {
         "name": "Sales – Transactions",
@@ -91,7 +97,10 @@ CARDS: list[dict] = [
             "card.title": "Transactions",
             "card.description": "Completed sales orders",
         },
-        "col": 5, "row": 0, "size_x": 5, "size_y": 5,
+        "col": 5,
+        "row": 0,
+        "size_x": 5,
+        "size_y": 5,
     },
     {
         "name": "Sales – Unique Customers",
@@ -101,7 +110,10 @@ CARDS: list[dict] = [
             "card.title": "Unique Customers",
             "card.description": "Distinct buyers",
         },
-        "col": 10, "row": 0, "size_x": 5, "size_y": 5,
+        "col": 10,
+        "row": 0,
+        "size_x": 5,
+        "size_y": 5,
     },
     {
         "name": "Sales – Units Sold",
@@ -111,7 +123,10 @@ CARDS: list[dict] = [
             "card.title": "Units Sold",
             "card.description": "Total product units dispatched",
         },
-        "col": 15, "row": 0, "size_x": 4, "size_y": 5,
+        "col": 15,
+        "row": 0,
+        "size_x": 4,
+        "size_y": 5,
     },
     {
         "name": "Sales – Avg Order Value",
@@ -123,7 +138,10 @@ CARDS: list[dict] = [
             "scalar.decimals": 2,
             "column_settings": ghs_column_settings("Avg Order (GHS)"),
         },
-        "col": 19, "row": 0, "size_x": 5, "size_y": 5,
+        "col": 19,
+        "row": 0,
+        "size_x": 5,
+        "size_y": 5,
     },
     # Trend charts
     {
@@ -143,7 +161,10 @@ CARDS: list[dict] = [
             "card.description": "Revenue per day — zoom with the Date Range filter",
             "column_settings": ghs_column_settings("Revenue (GHS)"),
         },
-        "col": 0, "row": 5, "size_x": 16, "size_y": 9,
+        "col": 0,
+        "row": 5,
+        "size_x": 16,
+        "size_y": 9,
     },
     {
         "name": "Sales – Monthly Revenue",
@@ -162,7 +183,10 @@ CARDS: list[dict] = [
             "card.description": "Monthly totals — current month excluded",
             "column_settings": ghs_column_settings("Revenue (GHS)"),
         },
-        "col": 16, "row": 5, "size_x": 8, "size_y": 9,
+        "col": 16,
+        "row": 5,
+        "size_x": 8,
+        "size_y": 9,
     },
     # Weekly summary table
     {
@@ -176,6 +200,9 @@ CARDS: list[dict] = [
             "card.description": "Last 12 weeks — revenue, orders, customers and units",
             "column_settings": ghs_column_settings("Revenue (GHS)", "Avg Order (GHS)"),
         },
-        "col": 0, "row": 14, "size_x": 24, "size_y": 10,
+        "col": 0,
+        "row": 14,
+        "size_x": 24,
+        "size_y": 10,
     },
 ]

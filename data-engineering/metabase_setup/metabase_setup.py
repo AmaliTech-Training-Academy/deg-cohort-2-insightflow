@@ -2,7 +2,6 @@
 import logging
 
 import psycopg2
-
 from config import METABASE_URL, PG_CONFIG
 from metabase_client import (
     build_dashboard,
@@ -20,19 +19,27 @@ logging.basicConfig(
 )
 log = logging.getLogger("insightflow")
 
+
 def create_views() -> None:
     """Drop and recreate all analytics views in PostgreSQL."""
     log.info("Creating views...")
     with psycopg2.connect(**PG_CONFIG) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
-            for view in ("v_weekly_summary", "v_monthly_revenue", "v_daily_revenue", "v_kpi_summary"):
+            for view in (
+                "v_weekly_summary",
+                "v_monthly_revenue",
+                "v_daily_revenue",
+                "v_kpi_summary",
+            ):
                 cur.execute(f"DROP VIEW IF EXISTS {view} CASCADE;")
             for statement in VIEWS_SQL.strip().split(";"):
                 statement = statement.strip()
                 if statement:
                     cur.execute(statement + ";")
-                    view_name = next((w for w in statement.split() if w.startswith("v_")), "?")
+                    view_name = next(
+                        (w for w in statement.split() if w.startswith("v_")), "?"
+                    )
                     log.info("  [OK] %s", view_name)
 
 
