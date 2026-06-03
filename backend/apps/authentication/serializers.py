@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
@@ -43,6 +44,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["role"]
         extra_kwargs = {
+            "email": {"required": True},
             "first_name": {"required": True},
             "last_name": {"required": True},
         }
@@ -154,7 +156,9 @@ class LogoutSerializer(serializers.Serializer):
             TokenBlacklist.objects.create(
                 token=refresh_token,
                 user=self.context["request"].user,
-                expires_at=refresh.get_exp(),
+                expires_at=datetime.fromtimestamp(
+                    refresh.payload["exp"], tz=timezone.utc
+                ),
             )
         except Exception as e:
             logger.warning("An error occurred during token processing: %s", e)
