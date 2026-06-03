@@ -60,6 +60,21 @@ class InternalServerException(AppException):
     default_detail = "Internal server error."
 
 
+class FileSizeLimitException(ValidationException):
+    default_code = "file_too_large"
+    default_detail = "Uploaded file exceeds the maximum allowed size."
+
+
+class UnsupportedFileTypeException(ValidationException):
+    default_code = "unsupported_file_type"
+    default_detail = "File type is not supported."
+
+
+class CSVParseException(ValidationException):
+    default_code = "csv_parse_error"
+    default_detail = "Could not read CSV — check format and encoding."
+
+
 def custom_exception_handler(exc, context):
     """Custom exception handler for API responses."""
     response = exception_handler(exc, context)
