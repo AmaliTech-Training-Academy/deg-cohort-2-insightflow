@@ -101,7 +101,6 @@ class FeedbackIngestionDeduplicationTest(TestCase):
         self.assertEqual(summary["errors"], 0)
 
     def test_online_order_fk_resolved_when_it_exists(self):
-        user = User.objects.get(username="testuser")
         order = OnlineOrder.objects.create(
             onlineOrderId=42,
             customerId=self.customer,
@@ -158,7 +157,8 @@ class FeedbackIngestionSummaryTest(TestCase):
         connector.fetch_all.return_value = [_make_record()]
         service = FeedbackIngestionService(connector=connector)
 
-        with self.assertLogs("apps.ingestion.services.feedback_ingestion_service", level=logging.INFO) as log_ctx:
+        logger_name = "apps.ingestion.services.feedback_ingestion_service"
+        with self.assertLogs(logger_name, level=logging.INFO) as log_ctx:
             service.ingest()
 
         self.assertTrue(any("Feedback ingestion complete" in line for line in log_ctx.output))

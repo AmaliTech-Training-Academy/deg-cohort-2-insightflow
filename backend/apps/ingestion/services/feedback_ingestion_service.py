@@ -61,7 +61,10 @@ class FeedbackIngestionService:
         try:
             customer = Customer.objects.get(customerId=customer_id)
         except Customer.DoesNotExist:
-            raise ValueError(f"Customer '{customer_id}' not found — skipping response {record.get('responseId')}")
+            raise ValueError(
+                f"Customer '{customer_id}' not found"
+                f" — skipping response {record.get('responseId')}"
+            )
 
         online_order_id = record.get("onlineOrderId")
         online_order = None
@@ -84,4 +87,4 @@ class FeedbackIngestionService:
                 "freeTextComments": record.get("freeTextComments", ""),
             },
         )
-        return created
+        return bool(created)
