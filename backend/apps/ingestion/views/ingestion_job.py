@@ -1,11 +1,16 @@
 import logging
+from datetime import timedelta
 
+from celery.result import AsyncResult
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models.base import InjectionJob
+
+STALE_THRESHOLD = timedelta(minutes=10)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +28,18 @@ class IngestionJobStatusView(APIView):
 
     def get(self, request, job_id):
         job = get_object_or_404(InjectionJob, id=job_id)
+
+        # Detect worker crashes: RUNNING job whose task is dead or stale
+        if job.status == InjectionJob.StatusChoices.RUNNING:
+            task_dead = False
+            if job.task_id:
+                result = AsyncResult(job.task_id)
+                task_dead = result.state in ("FAILURE", "REVOKED")
+            stale = timezone.now() - job.updated_at > STALE_THRESHOLD
+            if task_dead or stale:
+                job.status = InjectionJob.StatusChoices.FAILED
+                job.error_report = {"fatal_error": "Worker stopped unexpectedly"}
+                job.save(update_fields=["status", "error_report"])
 
         response = {
             "job_id": job.id,

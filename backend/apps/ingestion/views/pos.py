@@ -63,8 +63,10 @@ class POSStagingListCreateView(ListCreateAPIView):
         # step 2 — save file to disk, create IngestionJob
         job = service.accept_upload(file, uploaded_by=request.user.id)
 
-        # step 3 — dispatch to Celery, view is done
-        process_pos_file.delay(job.id)
+        # step 3 — dispatch to Celery, store task_id for state tracking
+        task = process_pos_file.delay(job.id)
+        job.task_id = task.id
+        job.save(update_fields=["task_id"])
 
         # step 4 — return 202 with job_id for client to poll
         return Response(

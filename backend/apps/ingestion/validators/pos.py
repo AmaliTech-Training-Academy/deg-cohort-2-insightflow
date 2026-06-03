@@ -242,6 +242,11 @@ def validate_pos_row(row: dict, row_num: int | None = None) -> list:
 
 
 def _is_valid_date(raw: str) -> bool:
+    try:
+        datetime.fromisoformat(raw.strip())
+        return True
+    except ValueError:
+        pass
     for fmt in ACCEPTED_DATE_FORMATS:
         try:
             datetime.strptime(raw.strip(), fmt)
