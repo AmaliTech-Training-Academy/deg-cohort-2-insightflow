@@ -54,13 +54,11 @@ class POSStagingListCreateView(ListCreateAPIView):
     def _handle_csv_upload(self, request):
         file = request.FILES["file"]
 
-        # step 1 — validate the file (size, extension, columns)
-        result = service.validate_upload(file)
-        if not result["ok"]:
-            return Response(
-                {k: v for k, v in result.items() if k != "ok"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # step 1 — validate (raises FileSizeLimitException,
+        #           UnsupportedFileTypeException, CSVParseException, or
+        #           ValidationException on failure; the custom exception handler
+        #           converts them to the appropriate 4xx response automatically)
+        service.validate_upload(file)
 
         # step 2 — save file to disk, create IngestionJob
         job = service.accept_upload(file, uploaded_by=request.user.id)

@@ -9,6 +9,12 @@ import io
 from unittest.mock import MagicMock, patch
 
 import pytest
+from apps.core.exceptions import (
+    CSVParseException,
+    FileSizeLimitException,
+    UnsupportedFileTypeException,
+    ValidationException,
+)
 from apps.ingestion.views.pos import POSStagingListCreateView
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -101,10 +107,12 @@ class TestPOSStagingCSVUpload:
         )
         self.view = POSStagingListCreateView.as_view()
 
-    def _post_csv(self, file, mock_validate_result=None, mock_job=None):
-        """Helper: patch service + task, POST the file, return response."""
-        if mock_validate_result is None:
-            mock_validate_result = {"ok": True}
+    def _post_csv(self, file, mock_validate_side_effect=None, mock_job=None):
+        """Helper: patch service + task, POST the file, return response.
+
+        Pass a custom-exception instance as ``mock_validate_side_effect`` to
+        simulate validation failure; omit it (or pass None) for the happy path.
+        """
         if mock_job is None:
             mock_job = _mock_job()
 
@@ -113,8 +121,8 @@ class TestPOSStagingCSVUpload:
             patch("apps.ingestion.views.pos.service.accept_upload") as ma,
             patch("apps.ingestion.views.pos.process_pos_file") as mt,
         ):
-
-            mv.return_value = mock_validate_result
+            if mock_validate_side_effect is not None:
+                mv.side_effect = mock_validate_side_effect
             ma.return_value = mock_job
             mt.delay.return_value = None
 
@@ -162,35 +170,35 @@ class TestPOSStagingCSVUpload:
         mock_task.delay.assert_called_once_with(99)
 
     def test_validation_failure_returns_400(self):
-        """If service.validate_upload fails, returns 400 with error key."""
+        """If service.validate_upload raises, returns 400 with error key."""
         response, _ = self._post_csv(
             _csv_file(),
-            mock_validate_result={
-                "ok": False,
-                "error": "Missing required columns",
-                "missing_columns": ["cashier_id"],
-            },
+            mock_validate_side_effect=ValidationException(
+                detail="Missing required columns",
+                details={"missing_columns": ["cashier_id"]},
+            ),
         )
         assert response.status_code == 400
         assert "error" in response.data
 
     def test_validation_failure_missing_columns_in_response(self):
-        """400 response from column mismatch includes missing_columns key."""
+        """400 response from column mismatch includes missing_columns in details."""
         response, _ = self._post_csv(
             _csv_file(),
-            mock_validate_result={
-                "ok": False,
-                "error": "Missing required columns",
-                "missing_columns": ["cashier_id", "product_sku"],
-            },
+            mock_validate_side_effect=ValidationException(
+                detail="Missing required columns",
+                details={"missing_columns": ["cashier_id", "product_sku"]},
+            ),
         )
-        assert "missing_columns" in response.data
+        assert "missing_columns" in response.data.get("details", {})
 
     def test_validation_ok_key_not_in_400_response(self):
-        """The internal 'ok' key is stripped from 400 error responses."""
+        """Exception-based validation never exposes an internal 'ok' key."""
         response, _ = self._post_csv(
             _csv_file(),
-            mock_validate_result={"ok": False, "error": "File too large"},
+            mock_validate_side_effect=FileSizeLimitException(
+                detail="File is 60MB — maximum is 50MB"
+            ),
         )
         assert "ok" not in response.data
 
@@ -203,13 +211,12 @@ class TestPOSStagingCSVUpload:
         assert response.status_code == 401
 
     def test_celery_not_called_when_validation_fails(self):
-        """Celery task must NOT be dispatched when validation fails."""
+        """Celery task must NOT be dispatched when validation raises."""
         with (
             patch("apps.ingestion.views.pos.service.validate_upload") as mv,
             patch("apps.ingestion.views.pos.process_pos_file") as mt,
         ):
-
-            mv.return_value = {"ok": False, "error": "Bad file"}
+            mv.side_effect = UnsupportedFileTypeException()
             mt.delay.return_value = None
 
             request = self.factory.post(

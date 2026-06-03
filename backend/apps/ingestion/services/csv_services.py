@@ -6,6 +6,13 @@ import pandas as pd
 from django.db import transaction as db_transaction
 from django.utils import timezone
 
+from apps.core.exceptions import (
+    CSVParseException,
+    FileSizeLimitException,
+    UnsupportedFileTypeException,
+    ValidationException,
+)
+
 from ..models.base import InjectionJob
 from ..models.pos import PosTransaction, PosTransactionLine
 from ..validators.pos import validate_pos_file_columns, validate_pos_row
@@ -19,20 +26,24 @@ class POSIngestionService:
 
     # ── Phase 1 — view calls this ─────────────────────────────
 
-    def validate_upload(self, file) -> dict:
+    def validate_upload(self, file) -> None:
         """
         File-level checks only. Fast. No DB writes.
-        Returns {'ok': True} or {'ok': False, 'error': ..., ...}
+        Raises a specific exception on failure; returns None on success.
         """
 
         # size check
         if file.size > MAX_UPLOAD_BYTES:
             mb = round(file.size / (1024 * 1024), 1)
-            return {"ok": False, "error": f"File is {mb}MB — maximum is 50MB"}
+            raise FileSizeLimitException(
+                detail=f"File is {mb}MB — maximum is 50MB"
+            )
 
         # extension check
         if not file.name.lower().endswith(".csv"):
-            return {"ok": False, "error": "Only .csv files are accepted"}
+            raise UnsupportedFileTypeException(
+                detail="Only .csv files are accepted"
+            )
 
         # can pandas even open it?
         try:
@@ -44,21 +55,15 @@ class POSIngestionService:
             UnicodeDecodeError,
             OSError,
         ):
-            return {
-                "ok": False,
-                "error": "Could not read CSV — check format and encoding",
-            }
+            raise CSVParseException()
 
         # required columns check
         missing = validate_pos_file_columns(df_header.columns.tolist())
         if missing:
-            return {
-                "ok": False,
-                "error": "Missing required columns",
-                "missing_columns": missing,
-            }
-
-        return {"ok": True}
+            raise ValidationException(
+                detail="Missing required columns",
+                details={"missing_columns": missing},
+            )
 
     def accept_upload(self, file, uploaded_by=None) -> InjectionJob:
         """

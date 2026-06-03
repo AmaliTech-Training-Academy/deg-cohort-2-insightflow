@@ -118,6 +118,7 @@ REST_FRAMEWORK = {
         "user": "1000/hour",
         "login": "20/hour",
         "refresh_token": "100/hour",  # nosec B105
+        "pos_upload": "20/hour",
     },
 }
 
