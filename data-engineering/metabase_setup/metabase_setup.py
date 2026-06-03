@@ -2,7 +2,7 @@
 
 import logging
 import psycopg2
-from config import PG_CONFIG, METABASE_URL
+from config import METABASE_URL, PG_CONFIG
 from metabase_client import (
     wait_for_metabase,
     setup_metabase,

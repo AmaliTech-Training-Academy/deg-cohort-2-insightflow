@@ -4,13 +4,15 @@ import logging
 import re
 import requests
 import time
-from config import METABASE_URL, MB_ADMIN_EMAIL, MB_ADMIN_PASSWORD, METABASE_DB_CONFIG
+from config import METABASE_DB_CONFIG, MB_ADMIN_EMAIL, MB_ADMIN_PASSWORD, METABASE_URL
 
 # ----------------------------
 # Logging configuration
 # ----------------------------
 logger = logging.getLogger("MetabaseClient")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 # Shared session object
 _session = requests.Session()
@@ -77,14 +79,16 @@ def login():
 # Connect or create database
 # ----------------------------
 def get_or_create_database(session_id):
-    """Return the InsightFlow warehouse database ID, creating it in Metabase if needed."""
+    """Return the InsightFlow warehouse database ID, creating it if needed."""
     headers = {"X-Metabase-Session": session_id}
     target_name = METABASE_DB_CONFIG["name"]
 
     r = _session.get(f"{METABASE_URL}/api/database", headers=headers, timeout=10)
     r.raise_for_status()
     response = r.json()
-    db_list = response.get("data", response) if isinstance(response, dict) else response
+    db_list = (
+        response.get("data", response) if isinstance(response, dict) else response
+    )
 
     for db in db_list:
         if db.get("name") == target_name:
@@ -97,7 +101,9 @@ def get_or_create_database(session_id):
         "name": target_name,
         "details": METABASE_DB_CONFIG["details"],
     }
-    r = _session.post(f"{METABASE_URL}/api/database", json=payload, headers=headers, timeout=30)
+    r = _session.post(
+        f"{METABASE_URL}/api/database", json=payload, headers=headers, timeout=30
+    )
     r.raise_for_status()
     db_id = r.json()["id"]
     logger.info(f"Registered database '{target_name}' (ID: {db_id})")
@@ -115,13 +121,19 @@ def clean_up(session_id):
         resp = r.json()
         items = resp.get("data", resp) if isinstance(resp, dict) else resp
         for item in items or []:
-            _session.delete(f"{METABASE_URL}/api/{endpoint}/{item['id']}", headers=headers, timeout=10)
+            _session.delete(
+                f"{METABASE_URL}/api/{endpoint}/{item['id']}",
+                headers=headers,
+                timeout=10,
+            )
     logger.info("Cleaned up old dashboards and cards.")
 
 # ----------------------------
 # Build tabbed dashboard
 # ----------------------------
-def build_tabbed_dashboard(session_id, db_id, tabs, name="InsightFlow Analytics", parameters=None):
+def build_tabbed_dashboard(
+    session_id, db_id, tabs, name="InsightFlow Analytics", parameters=None
+):
     """Create one dashboard with multiple tabs, each with its own cards."""
     headers = {"X-Metabase-Session": session_id}
 
@@ -136,7 +148,10 @@ def build_tabbed_dashboard(session_id, db_id, tabs, name="InsightFlow Analytics"
     dashboard_id = r.json()["id"]
 
     if not db_id:
-        raise RuntimeError("Cannot build dashboard: database ID is None. Check WAREHOUSE_DB_* config.")
+        raise RuntimeError(
+            "Cannot build dashboard: database ID is None."
+            " Check WAREHOUSE_DB_* config."
+        )
 
     # 2. Create all cards first, tracking which tab each belongs to
     mb_tabs = []       # tab definitions with temporary negative IDs
@@ -149,7 +164,9 @@ def build_tabbed_dashboard(session_id, db_id, tabs, name="InsightFlow Analytics"
 
         tab_card_count = 0
         for card_def in cards:
-            clean_sql = re.sub(r'\[\[.*?\]\]', '', card_def["sql"], flags=re.DOTALL).strip()
+            clean_sql = re.sub(
+                r"\[\[.*?\]\]", "", card_def["sql"], flags=re.DOTALL
+            ).strip()
             payload = {
                 "name": card_def["name"],
                 "display": card_def["display"],
@@ -160,9 +177,17 @@ def build_tabbed_dashboard(session_id, db_id, tabs, name="InsightFlow Analytics"
                 },
                 "visualization_settings": {},
             }
-            r = _session.post(f"{METABASE_URL}/api/card", json=payload, headers=headers, timeout=10)
+            r = _session.post(
+                f"{METABASE_URL}/api/card",
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             if r.status_code not in (200, 202):
-                logger.warning(f"  [FAIL] card '{card_def['name']}' (status {r.status_code}): {r.text[:200]}")
+                logger.warning(
+                    f"  [FAIL] card '{card_def['name']}'"
+                    f" (status {r.status_code}): {r.text[:200]}"
+                )
                 continue
             card_index += 1
             tab_card_count += 1
@@ -279,10 +304,16 @@ def create_filter_value_cards(session_id, db_id):
         payload = {
             "name": fvc["name"],
             "display": "table",
-            "dataset_query": {"type": "native", "native": {"query": fvc["sql"]}, "database": db_id},
+            "dataset_query": {
+                "type": "native",
+                "native": {"query": fvc["sql"]},
+                "database": db_id,
+            },
             "visualization_settings": {}
         }
-        r = _session.post(f"{METABASE_URL}/api/card", json=payload, headers=headers, timeout=10)
+        r = _session.post(
+            f"{METABASE_URL}/api/card", json=payload, headers=headers, timeout=10
+        )
         if r.status_code in (200, 202):
             value_card_ids[fvc["key"]] = int(r.json()["id"])
             logger.info(
