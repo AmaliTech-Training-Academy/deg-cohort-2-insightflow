@@ -70,6 +70,9 @@ DATABASES = {
         "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": os.environ.get("DB_SSLMODE", "prefer"),
+        },
     }
 }
 
@@ -123,14 +126,20 @@ REST_FRAMEWORK = {
 }
 
 # ── Celery ────────────────────────────────────────────────────────────────────
-CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+_REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = _REDIS_URL
+CELERY_RESULT_BACKEND = _REDIS_URL
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_TASK_EXPIRES = 3600  # task results expire after 1 hour — prevent Redis OOM
 CELERY_RESULT_EXPIRES = 3600
+
+if _REDIS_URL.startswith("rediss://"):
+    _SSL_OPTS = {"ssl_cert_reqs": "CERT_NONE"}
+    CELERY_BROKER_TRANSPORT_OPTIONS = _SSL_OPTS
+    CELERY_REDIS_BACKEND_USE_SSL = _SSL_OPTS
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),

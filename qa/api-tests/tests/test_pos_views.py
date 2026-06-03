@@ -123,7 +123,7 @@ class TestPOSStagingCSVUpload:
             if mock_validate_side_effect is not None:
                 mv.side_effect = mock_validate_side_effect
             ma.return_value = mock_job
-            mt.delay.return_value = None
+            mt.delay.return_value = MagicMock(id="mock-task-id")
 
             request = self.factory.post(
                 "/api/ingestion/pos/", {"file": file}, format="multipart"
