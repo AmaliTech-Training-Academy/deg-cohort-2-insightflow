@@ -1,76 +1,63 @@
 import logging
 
 from rest_framework import status
+from rest_framework.exceptions import APIException as DRFAPIException
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 logger = logging.getLogger(__name__)
 
 
-class APIException(Exception):
-    """Base exception for API errors."""
-
-    def __init__(self, message, code=None, status_code=None):
-        self.message = message
-        self.code = code or "api_error"
-        self.status_code = status_code or status.HTTP_500_INTERNAL_SERVER_ERROR
-        super().__init__(message)
+class AppException(DRFAPIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_code = "api_error"
+    default_detail = "An unexpected error occurred."
 
 
-class ValidationException(APIException):
-    """Exception for validation errors."""
+class ValidationException(AppException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "validation_error"
+    default_detail = "Validation failed."
 
-    def __init__(self, message, details=None, code=None):
-        super().__init__(
-            message, code or "validation_error", status.HTTP_400_BAD_REQUEST
-        )
+    def __init__(self, detail=None, code=None, details=None):
+        super().__init__(detail, code)
         self.details = details or {}
 
 
-class NotFoundException(APIException):
-    """Exception for resource not found."""
-
-    def __init__(self, message, code=None):
-        super().__init__(message, code or "not_found", status.HTTP_404_NOT_FOUND)
-
-
-class UnauthorizedException(APIException):
-    """Exception for authentication failures."""
-
-    def __init__(self, message, code=None):
-        super().__init__(message, code or "unauthorized", status.HTTP_401_UNAUTHORIZED)
+class NotFoundException(AppException):
+    status_code = status.HTTP_404_NOT_FOUND
+    default_code = "not_found"
+    default_detail = "Resource not found."
 
 
-class ForbiddenException(APIException):
-    """Exception for permission denied."""
-
-    def __init__(self, message, code=None):
-        super().__init__(message, code or "forbidden", status.HTTP_403_FORBIDDEN)
-
-
-class ConflictException(APIException):
-    """Exception for resource conflicts."""
-
-    def __init__(self, message, code=None):
-        super().__init__(message, code or "conflict", status.HTTP_409_CONFLICT)
+class UnauthorizedException(AppException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_code = "unauthorized"
+    default_detail = "Authentication required."
 
 
-class RateLimitException(APIException):
-    """Exception for rate limiting."""
-
-    def __init__(self, message, code=None):
-        super().__init__(
-            message, code or "rate_limit_exceeded", status.HTTP_429_TOO_MANY_REQUESTS
-        )
+class ForbiddenException(AppException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = "forbidden"
+    default_detail = "Permission denied."
 
 
-class InternalServerException(APIException):
-    """Exception for internal server errors."""
+class ConflictException(AppException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
+    default_detail = "Resource conflict."
 
-    def __init__(self, message, code=None):
-        super().__init__(
-            message, code or "internal_error", status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+
+class RateLimitException(AppException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    default_code = "rate_limit_exceeded"
+    default_detail = "Rate limit exceeded."
+
+
+class InternalServerException(AppException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_code = "internal_error"
+    default_detail = "Internal server error."
 
 
 def custom_exception_handler(exc, context):
@@ -93,36 +80,28 @@ def custom_exception_handler(exc, context):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
-    if isinstance(exc, APIException):
-        return Response(
-            {
-                "error": True,
-                "message": exc.message,
-                "code": exc.code,
-                "details": getattr(exc, "details", {}),
-            },
-            status=exc.status_code,
-        )
-
-    detail = response.data
-    error_code = "api_error"
-
-    if isinstance(detail, dict):
-        if "detail" in detail:
-            message = str(detail["detail"])
-            error_code = "validation_error"
-        else:
-            message = "Validation failed."
-            detail = detail
+    if isinstance(exc, AppException):
+        message = str(exc.detail)
+        error_code = exc.default_code
+        extra_details = getattr(exc, "details", {})
+    elif isinstance(response.data, dict) and "detail" in response.data:
+        message = str(response.data["detail"])
+        error_code = "api_error"
+        extra_details = {}
+    elif isinstance(response.data, dict):
+        message = "Validation failed."
+        error_code = "validation_error"
+        extra_details = response.data
     else:
-        message = str(detail)
-        detail = {}
+        message = str(response.data)
+        error_code = "api_error"
+        extra_details = {}
 
     response.data = {
         "error": True,
         "message": message,
         "code": error_code,
-        "details": detail if isinstance(detail, dict) else {},
+        "details": extra_details,
     }
 
     logger.warning(

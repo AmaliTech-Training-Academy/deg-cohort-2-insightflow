@@ -42,21 +42,21 @@ class TestLogoutSuccess:
 
     def test_logout_creates_blacklist_entry(self):
         self.client.post(LOGOUT_URL, {"refresh": self.tokens["refresh"]}, format="json")
-        assert TokenBlacklist.objects.filter(user=self.user).exists()
+        assert TokenBlacklist.objects.filter(token=self.tokens["refresh"]).exists()
 
     def test_logout_blacklist_entry_stores_correct_token(self):
         self.client.post(LOGOUT_URL, {"refresh": self.tokens["refresh"]}, format="json")
-        entry = TokenBlacklist.objects.get(user=self.user)
+        entry = TokenBlacklist.objects.get(token=self.tokens["refresh"])
         assert entry.token == self.tokens["refresh"]
 
     def test_logout_blacklist_entry_has_expiry(self):
         self.client.post(LOGOUT_URL, {"refresh": self.tokens["refresh"]}, format="json")
-        entry = TokenBlacklist.objects.get(user=self.user)
+        entry = TokenBlacklist.objects.get(token=self.tokens["refresh"])
         assert entry.expires_at is not None
 
     def test_logout_blacklist_entry_links_to_correct_user(self):
         self.client.post(LOGOUT_URL, {"refresh": self.tokens["refresh"]}, format="json")
-        entry = TokenBlacklist.objects.get(user=self.user)
+        entry = TokenBlacklist.objects.get(token=self.tokens["refresh"])
         assert entry.user == self.user
 
     def test_logout_multiple_sessions_each_create_blacklist_entry(self):
@@ -64,6 +64,8 @@ class TestLogoutSuccess:
         self.client.post(LOGOUT_URL, {"refresh": self.tokens["refresh"]}, format="json")
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens2['access']}")
         self.client.post(LOGOUT_URL, {"refresh": tokens2["refresh"]}, format="json")
+        assert TokenBlacklist.objects.filter(token=self.tokens["refresh"]).exists()
+        assert TokenBlacklist.objects.filter(token=tokens2["refresh"]).exists()
         assert TokenBlacklist.objects.filter(user=self.user).count() == 2
 
     def test_logout_different_users_separate_blacklist_entries(self):
@@ -79,6 +81,8 @@ class TestLogoutSuccess:
         other_client.post(
             LOGOUT_URL, {"refresh": other_tokens["refresh"]}, format="json"
         )
+        assert TokenBlacklist.objects.filter(token=self.tokens["refresh"]).exists()
+        assert TokenBlacklist.objects.filter(token=other_tokens["refresh"]).exists()
         assert TokenBlacklist.objects.filter(user=self.user).count() == 1
         assert TokenBlacklist.objects.filter(user=other_user).count() == 1
 

@@ -80,13 +80,18 @@ class TestLoginSuccess:
     def test_login_access_token_authenticates_protected_endpoint(self):
         response = self.client.post(LOGIN_URL, self.credentials, format="json")
         access = response.data["tokens"]["access"]
+        refresh = response.data["tokens"]["refresh"]
+
+        # Without the access token the protected endpoint refuses the request
+        unauth_response = self.client.post("/api/auth/logout/", {}, format="json")
+        assert unauth_response.status_code == 401
+
+        # With the access token the same endpoint accepts the request
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
-        logout_response = self.client.post(
-            "/api/auth/logout/",
-            {"refresh": response.data["tokens"]["refresh"]},
-            format="json",
+        auth_response = self.client.post(
+            "/api/auth/logout/", {"refresh": refresh}, format="json"
         )
-        assert logout_response.status_code == 200
+        assert auth_response.status_code == 200
 
 
 @pytest.mark.django_db
