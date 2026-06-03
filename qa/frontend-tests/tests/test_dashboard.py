@@ -16,7 +16,9 @@ class TestDashboardPage:
         expect(auth_page.locator("text=Records Ingested")).to_be_visible()
 
     def test_source_health_table_renders(self, auth_page: Page):
-        expect(auth_page.locator("text=Data Source Health")).to_be_visible(timeout=15000)
+        expect(auth_page.locator("text=Data Source Health")).to_be_visible(
+            timeout=15000
+        )
         expect(auth_page.locator("th:has-text('Source')")).to_be_visible()
         expect(auth_page.locator("th:has-text('Status')")).to_be_visible()
 
@@ -25,7 +27,9 @@ class TestDashboardPage:
         expect(active).to_contain_text("Dashboard")
 
     def test_breadcrumb_shows_dashboard(self, auth_page: Page):
-        expect(auth_page.locator("nav[aria-label='Breadcrumb']")).to_contain_text("Dashboard")
+        expect(auth_page.locator("nav[aria-label='Breadcrumb']")).to_contain_text(
+            "Dashboard"
+        )
 
     def test_theme_toggle_button_visible(self, auth_page: Page):
         expect(auth_page.locator("button[aria-label*='mode']")).to_be_visible()

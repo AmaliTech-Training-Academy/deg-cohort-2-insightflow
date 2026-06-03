@@ -1,4 +1,5 @@
 import os
+
 from playwright.sync_api import Page, expect
 
 
@@ -34,7 +35,9 @@ class TestUploadPage:
         self._go(auth_page, base_url)
         expect(auth_page.locator("button[type='submit']")).to_be_visible()
 
-    def test_start_upload_button_disabled_without_file(self, auth_page: Page, base_url: str):
+    def test_start_upload_button_disabled_without_file(
+        self, auth_page: Page, base_url: str
+    ):
         self._go(auth_page, base_url)
         expect(auth_page.locator("button[type='submit']")).to_be_disabled()
 
@@ -49,7 +52,9 @@ class TestUploadPage:
         file_input = auth_page.locator("input[type='file']")
         expect(file_input).to_have_attribute("accept", ".csv")
 
-    def test_upload_button_enabled_after_csv_selected(self, auth_page: Page, base_url: str):
+    def test_upload_button_enabled_after_csv_selected(
+        self, auth_page: Page, base_url: str
+    ):
         self._go(auth_page, base_url)
         tmp_path = "/tmp/test_upload.csv"
         with open(tmp_path, "w") as f:
@@ -85,7 +90,9 @@ class TestUploadPage:
         active = auth_page.locator("nav a[aria-current='page']")
         expect(active).to_contain_text("New upload")
 
-    def test_breadcrumb_shows_uploads_and_new_upload(self, auth_page: Page, base_url: str):
+    def test_breadcrumb_shows_uploads_and_new_upload(
+        self, auth_page: Page, base_url: str
+    ):
         self._go(auth_page, base_url)
         crumb = auth_page.locator("nav[aria-label='Breadcrumb']")
         expect(crumb).to_contain_text("Uploads")

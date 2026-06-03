@@ -24,7 +24,9 @@ class TestSidebar:
         expect(auth_page).to_have_url(f"{base_url}/dashboard")
 
     def test_new_upload_link_navigates(self, auth_page: Page, base_url: str):
-        auth_page.locator("aside").get_by_role("link", name="New upload", exact=True).click()
+        auth_page.locator("aside").get_by_role(
+            "link", name="New upload", exact=True
+        ).click()
         expect(auth_page).to_have_url(f"{base_url}/uploads/new")
 
     def test_ingestion_history_link_navigates(self, auth_page: Page, base_url: str):
@@ -32,7 +34,9 @@ class TestSidebar:
         expect(auth_page).to_have_url(f"{base_url}/uploads/history")
 
     def test_active_link_has_aria_current(self, auth_page: Page):
-        expect(auth_page.locator("nav a[aria-current='page']")).to_contain_text("Dashboard")
+        expect(auth_page.locator("nav a[aria-current='page']")).to_contain_text(
+            "Dashboard"
+        )
 
     def test_user_name_visible_in_sidebar(self, auth_page: Page):
         expect(auth_page.locator("aside")).to_contain_text("Rivera")
