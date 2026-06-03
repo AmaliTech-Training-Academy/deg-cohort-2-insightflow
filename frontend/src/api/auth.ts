@@ -68,3 +68,10 @@ export async function refreshToken(
   // POST /api/auth/refresh/
   return { access: "mock-new-access-token" };
 }
+
+export async function forgotPassword(
+  _email: string
+): Promise<{ detail: string }> {
+  // POST /api/auth/password-reset/
+  return { detail: "Password reset email sent." };
+}

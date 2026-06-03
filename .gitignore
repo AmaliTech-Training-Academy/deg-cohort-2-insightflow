@@ -52,3 +52,4 @@ docker-compose.override.yml
 **/tfplan
 
 /tunnel-dev.sh
+report.html

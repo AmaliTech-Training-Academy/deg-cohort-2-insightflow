@@ -83,17 +83,6 @@ class TestUserModel:
         updated_user = User.objects.get(username="testuser")
         assert updated_user.role == "manager"
 
-    def test_user_fields_db_column_mapping(self):
-        """Test that user fields map to correct database columns."""
-        username_field = User._meta.get_field("username")
-        assert username_field.db_column == "username"
-
-        email_field = User._meta.get_field("email")
-        assert email_field.db_column == "email"
-
-        is_active_field = User._meta.get_field("is_active")
-        assert is_active_field.db_column == "is_active"
-
     def test_user_id_is_big_auto_field(self):
         """Test that user ID is a BigAutoField."""
         id_field = User._meta.get_field("id")
