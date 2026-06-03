@@ -3,7 +3,7 @@
 import logging
 
 import psycopg2
-from config import METABASE_URL, PG_CONFIG
+from config import METABASE_URL, PG_CONFIG  # type: ignore[attr-defined]
 from customer.cards import TAB4_CARDS
 from customer.views import VIEWS_SQL as CUSTOMER_VIEWS
 from metabase_client import (

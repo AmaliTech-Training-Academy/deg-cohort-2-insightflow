@@ -5,7 +5,12 @@ import re
 import time
 
 import requests
-from config import MB_ADMIN_EMAIL, MB_ADMIN_PASSWORD, METABASE_DB_CONFIG, METABASE_URL
+from config import (  # type: ignore[attr-defined]
+    MB_ADMIN_EMAIL,
+    MB_ADMIN_PASSWORD,
+    METABASE_DB_CONFIG,
+    METABASE_URL,
+)
 
 # ----------------------------
 # Logging configuration
@@ -290,8 +295,7 @@ def create_filter_value_cards(session_id, db_id):
             "key": "country_values",
             "name": "Country Filter",
             "sql": (
-                "SELECT DISTINCT country FROM v_country_comparison"
-                " ORDER BY country;"
+                "SELECT DISTINCT country FROM v_country_comparison" " ORDER BY country;"
             ),
         },
         {
