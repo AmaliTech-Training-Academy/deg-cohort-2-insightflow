@@ -47,6 +47,8 @@ jobs:
             docker:
               - 'backend/Dockerfile'
               - 'backend/requirements.txt'
+              - 'frontend/Dockerfile'
+              - 'frontend/package.json'
             devops:
               - 'devops/**'
               - 'pyproject.toml'
@@ -295,10 +297,21 @@ jobs:
       - name: Build backend Docker image
         run: docker build -t insightflow-backend:ci ./backend
 
-      - name: Scan image with Trivy
+      - name: Scan backend image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: insightflow-backend:ci
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
+
+      - name: Build frontend Docker image
+        run: docker build -t insightflow-frontend:ci ./frontend
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: insightflow-frontend:ci
           exit-code: "1"
           severity: CRITICAL
           ignore-unfixed: true
