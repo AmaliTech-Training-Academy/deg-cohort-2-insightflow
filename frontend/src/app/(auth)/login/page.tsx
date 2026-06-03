@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { login } from "@/api/auth";
 import { setToken } from "@/lib/tokenStorage";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,32 +39,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center relative px-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-slate-900 flex flex-col items-center justify-center relative px-4 transition-colors">
       <button
         type="button"
-        title="Toggle dark mode"
-        className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        aria-label="Toggle dark mode"
+        className="absolute top-4 right-4 p-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
       >
-        <MoonIcon />
+        {mounted && theme === "dark" ? <SunIcon /> : <MoonIcon />}
       </button>
 
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 px-8 py-8">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 px-8 py-8">
           {/* Logo */}
           <div className="flex flex-col items-center gap-2 mb-7">
             <InsightFlowIcon />
-            <span className="text-lg font-semibold text-gray-900 tracking-tight">
+            <span className="text-lg font-semibold text-gray-900 dark:text-slate-100 tracking-tight">
               InsightFlow
             </span>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
-          <p className="text-sm text-gray-500 mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-1">Sign in</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
             Operations console for the retail data pipeline.
           </p>
 
           {error && (
-            <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="mb-5 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 px-4 py-3 text-sm text-red-700 dark:text-red-300">
               {error}
             </div>
           )}
@@ -70,12 +75,12 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5"
               >
                 Email
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
                   <EnvelopeIcon />
                 </span>
                 <input
@@ -85,7 +90,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@insightflow.io"
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                  className="w-full pl-9 pr-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-700 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
                 />
               </div>
             </div>
@@ -94,12 +99,12 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5"
               >
                 Password
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
                   <LockIcon />
                 </span>
                 <input
@@ -108,12 +113,12 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                  className="w-full pl-9 pr-10 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -123,18 +128,18 @@ export default function LoginPage() {
 
             {/* Keep signed in + Forgot password */}
             <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={keepSignedIn}
                   onChange={(e) => setKeepSignedIn(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                  className="w-4 h-4 rounded border-gray-300 dark:border-slate-600 text-green-600 focus:ring-green-500 cursor-pointer"
                 />
                 Keep me signed in
               </label>
               <Link
                 href="/forgot-password"
-                className="text-sm text-green-600 hover:text-green-700 font-medium transition-colors"
+                className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
               >
                 Forgot password?
               </Link>
@@ -149,11 +154,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-5 pt-5 border-t border-gray-100 text-center text-sm text-gray-500">
+          <div className="mt-5 pt-5 border-t border-gray-100 dark:border-slate-700 text-center text-sm text-gray-500 dark:text-slate-400">
             Don&apos;t have an account?{" "}
             <Link
               href="/register"
-              className="text-green-600 hover:text-green-700 font-medium transition-colors"
+              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
             >
               Register
             </Link>
@@ -181,6 +186,18 @@ function InsightFlowIcon() {
         <polyline points="3,12 7,12 9,5 12,19 15,8 17,12 21,12" />
       </svg>
     </div>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
   );
 }
 
