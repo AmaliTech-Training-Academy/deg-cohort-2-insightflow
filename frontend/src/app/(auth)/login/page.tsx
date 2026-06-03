@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { login } from "@/api/auth";
-import { setToken } from "@/lib/tokenStorage";
+import { ApiError } from "@/api/client";
+import { setToken, setStoredUser } from "@/lib/tokenStorage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,9 +31,10 @@ export default function LoginPage() {
     try {
       const res = await login({ email, password });
       setToken(res.access);
+      setStoredUser(res.user);
       router.replace("/dashboard");
-    } catch {
-      setError("Invalid email or password. Please try again.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Invalid email or password. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -126,8 +128,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Keep signed in + Forgot password */}
-            <div className="flex items-center justify-between pt-1">
+            {/* Keep signed in */}
+            <div className="flex items-center pt-1">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -137,12 +139,6 @@ export default function LoginPage() {
                 />
                 Keep me signed in
               </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
-              >
-                Forgot password?
-              </Link>
             </div>
 
             <button

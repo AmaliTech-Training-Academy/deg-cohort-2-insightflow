@@ -1,9 +1,19 @@
 import { useState } from "react";
-import { getToken, setToken, clearToken } from "@/lib/tokenStorage";
+import {
+  getToken,
+  setToken,
+  clearAllTokens,
+  getStoredUser,
+  setStoredUser,
+  clearStoredUser,
+} from "@/lib/tokenStorage";
+import { logout as logoutApi } from "@/api/auth";
 import type { User } from "@/types";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUserState] = useState<User | null>(
+    () => getStoredUser<User>()
+  );
 
   const isAuthenticated = Boolean(getToken());
 
@@ -11,9 +21,17 @@ export function useAuth() {
     setToken(token);
   }
 
-  function logout() {
-    clearToken();
-    setUser(null);
+  function setUser(u: User | null) {
+    setUserState(u);
+    if (u) setStoredUser(u);
+    else clearStoredUser();
+  }
+
+  async function logout() {
+    await logoutApi();
+    clearAllTokens();
+    clearStoredUser();
+    setUserState(null);
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
