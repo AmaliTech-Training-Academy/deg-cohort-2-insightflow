@@ -238,9 +238,9 @@ resource "aws_iam_role_policy" "github_deploy_prod" {
       },
       # ── Terraform — secrets (prod namespace only) ────────────────────────────
       {
-        Sid    = "SecretsManager"
-        Effect = "Allow"
-        Action = ["secretsmanager:*"]
+        Sid      = "SecretsManager"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:*"]
         Resource = "arn:aws:secretsmanager:*:${data.aws_caller_identity.current.account_id}:secret:insightflow-prod/*"
       },
       # ── Terraform — ACM cert (read-only; cert is pre-provisioned) ───────────
