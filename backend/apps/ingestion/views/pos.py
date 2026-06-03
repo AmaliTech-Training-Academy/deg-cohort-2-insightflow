@@ -1,5 +1,7 @@
 import logging
 
+from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework import status
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -23,6 +25,45 @@ logger = logging.getLogger(__name__)
 service = POSIngestionService()
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="List POS staging records",
+        description="Returns all POS transaction line records in the staging area.",
+    ),
+    create=extend_schema(
+        summary="Upload POS CSV file",
+        description=(
+            "Upload a POS CSV file (max 50MB). "
+            "Required columns: transaction_id, date, store_id, product_sku, "
+            "quantity, unit_price, total. "
+            "Returns a job_id — poll GET /api/ingestion/{job_id}/status/ for progress."
+        ),
+        request={
+            "multipart/form-data": inline_serializer(
+                name="POSCSVUpload",
+                fields={"file": drf_serializers.FileField()},
+            )
+        },
+        responses={
+            202: inline_serializer(
+                name="POSUploadAccepted",
+                fields={
+                    "job_id": drf_serializers.IntegerField(),
+                    "status": drf_serializers.CharField(),
+                    "total_rows": drf_serializers.IntegerField(),
+                    "message": drf_serializers.CharField(),
+                },
+            ),
+            400: inline_serializer(
+                name="POSUploadError",
+                fields={
+                    "error": drf_serializers.CharField(),
+                    "details": drf_serializers.DictField(required=False),
+                },
+            ),
+        },
+    ),
+)
 class POSStagingListCreateView(ListCreateAPIView):
     """
     GET  /api/ingestion/pos/   — list all POS staging records
