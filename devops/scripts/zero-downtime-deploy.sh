@@ -107,11 +107,11 @@ git checkout --quiet --detach "$COMMIT_SHA"
 log "Checked out ${COMMIT_SHA}"
 
 # ── 3. Build new images ───────────────────────────────────────────────────────
-log "Building backend and etl → insightflow-{backend,etl}:${DEPLOY_TAG}"
+log "Building backend, frontend and etl → insightflow-{backend,frontend,etl}:${DEPLOY_TAG}"
 DEPLOY_TAG="$DEPLOY_TAG" $COMPOSE build \
   --parallel \
   --build-arg COMMIT_SHA="$COMMIT_SHA" \
-  backend etl
+  backend frontend etl
 log "Build complete"
 
 # ── 4. Canary pre-flight ──────────────────────────────────────────────────────
@@ -154,6 +154,9 @@ mv "$TMP" "$APP_ENV_FILE"
 log "Rolling-replacing backend..."
 $COMPOSE up -d --no-deps --remove-orphans backend
 
+log "Rolling-replacing frontend..."
+$COMPOSE up -d --no-deps --remove-orphans frontend
+
 log "Rolling-replacing etl..."
 $COMPOSE up -d --no-deps --remove-orphans etl
 
@@ -175,7 +178,7 @@ if [[ "$LIVE_OK" != "true" ]]; then
   grep -v '^DEPLOY_TAG=' "$APP_ENV_FILE" > "$TMP"
   echo "DEPLOY_TAG=${PREV_TAG}" >> "$TMP"
   mv "$TMP" "$APP_ENV_FILE"
-  $COMPOSE up -d --no-deps --remove-orphans backend
+  $COMPOSE up -d --no-deps --remove-orphans backend frontend
   sleep 15
   RB_HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
             "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
