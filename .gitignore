@@ -1,3 +1,4 @@
+## Build artifacts
 target/
 *.class
 *.jar
@@ -23,6 +24,10 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+## Data-engineering virtual environment and generated outputs
+data-engineering/data_eng/
+data-engineering/lineage/
 
 ## Env & secrets
 .env
@@ -50,4 +55,5 @@ docker-compose.override.yml
 **/terraform.tfstate.backup
 **/tfplan
 
+/tunnel-dev.sh
 report.html

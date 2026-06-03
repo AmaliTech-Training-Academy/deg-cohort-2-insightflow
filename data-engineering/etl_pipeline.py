@@ -21,7 +21,6 @@ import argparse
 import logging
 import sys
 import uuid
-from collections.abc import Callable
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -47,9 +46,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 from etl.alerts import AlertManager, AnomalyAlert
 from etl.extract import Extractor
-from etl.lineage import LineageTracker
+from etl.lineage import LineageStage, LineageTracker  # noqa: F401
 from etl.load import Loader
-from etl.quality import QUALITY_THRESHOLDS, DataQualityChecker
+from etl.notify import send_pipeline_report
+from etl.quality import AnomalyDetector, DataQualityChecker, SourceQualityReport
 from etl.state import get_watermark_date
 from etl.transform import Transformer
 
@@ -67,58 +67,81 @@ _LINEAGE_DIR = Path(__file__).parent / "lineage"
 
 
 # ---------------------------------------------------------------------------
-# Quality helper
+# Quality + anomaly helper
 # ---------------------------------------------------------------------------
 
+# Numeric columns to scan for statistical outliers per source
+_ANOMALY_COLS: dict[str, list[str]] = {
+    "posTransactions": ["quantity", "unitPrice", "discountApplied", "totalAmount"],
+    "onlineOrders": ["quantity", "unitPrice", "discountApplied", "totalAmount"],
+    "feedback": ["satisfactionScore", "npsScore", "productRating", "deliveryRating"],
+    "inventory": ["stockQuantity", "daysSinceRestock"],
+}
 
-def _run_quality_checks(
+
+def _check_source_quality(
     df: pd.DataFrame,
-    table_name: str,
+    source: str,
     checker: DataQualityChecker,
     alert_mgr: AlertManager,
-    key_cols: list[str],
-    date_col: str | None = None,
-    discount_col: str | None = None,
-) -> dict:
-    """Run standard quality checks on *df* and register alerts.
+    tracker: LineageTracker,
+) -> SourceQualityReport:
+    """Score quality, detect anomalies, register alerts, record lineage.
 
-    Returns the quality summary dict.
+    Applies the canonical rule suite via ``DataQualityChecker.score_source()``,
+    runs IQR outlier detection, registers ``AnomalyAlert`` objects on
+    *alert_mgr*, and records a QUALITY_CHECK lineage event on *tracker*.
+
+    Returns
+    -------
+    SourceQualityReport
+        Callers use this to flush alerts and collect reports for the
+        end-of-run email.
     """
-    checks: list[tuple[str, Callable[[pd.DataFrame], pd.Series]]] = [
-        ("null_keys", lambda d: checker.check_null_keys(d, key_cols)),
-        ("positive_quantities", checker.check_positive_quantities),
-        ("positive_prices", checker.check_positive_prices),
-    ]
-    if date_col:
-        _dc = date_col  # narrowed to str; captured so lambda stays single-arg
-        checks.append(
-            ("date_not_future", lambda d: checker.check_date_not_future(d, _dc))
-        )
-    if discount_col:
-        _disc = discount_col  # narrowed to str; captured so lambda stays single-arg
-        checks.append(
-            ("discount_range", lambda d: checker.check_discount_range(d, _disc))
+    _, report = checker.score_source(df, source)
+
+    # Statistical outlier detection
+    detector = AnomalyDetector()
+    outlier_cols = _ANOMALY_COLS.get(source, [])
+    report.flagged_outliers = detector.scan(df, outlier_cols)
+
+    for col, outlier_idxs in report.flagged_outliers.items():
+        sample = [str(df.at[i, col]) for i in outlier_idxs[:3] if i in df.index]
+        alert_mgr.add(
+            AnomalyAlert(
+                table=source,
+                rule=f"outlier_{col}",
+                affected_rows=len(outlier_idxs),
+                sample_values=sample,
+                severity="WARNING",
+            )
         )
 
-    _, summary = checker.score_dataframe(df, table_name, checks)
-    summary["table"] = table_name
-
-    # Emit one alert per anomaly (sampled)
-    for anomaly in summary.get("anomalies", []):
+    # Rule-failure alerts
+    for anomaly in report.anomalies:
         for rule in anomaly.get("failed_rules", []):
-            threshold = QUALITY_THRESHOLDS.get(table_name, 0.95)
-            severity = "CRITICAL" if summary["overall_score"] < threshold else "WARNING"
+            severity = "CRITICAL" if report.is_critical() else "WARNING"
             alert_mgr.add(
                 AnomalyAlert(
-                    table=table_name,
+                    table=source,
                     rule=rule,
-                    affected_rows=summary["failed_rows"],
+                    affected_rows=report.failed_rows,
                     sample_values=[anomaly.get("row_id")],
                     severity=severity,
                 )
             )
 
-    return summary
+    tracker.record_quality(source, report)
+
+    log.info(
+        "Quality [%s]: score=%.4f (%d/%d rows passed)%s",
+        source,
+        report.overall_score,
+        report.passed_rows,
+        report.total_rows,
+        " — CRITICAL" if report.is_critical() else "",
+    )
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -155,21 +178,29 @@ def run_pipeline(since: date | None = None) -> None:
         since = get_watermark_date(warehouse_engine)
         log.info("Auto-detected watermark since=%s from warehouse", since)
 
+    # Tracker is created here (before extraction) so extract-stage events
+    # can be recorded alongside quality, cleanse, and load events.
+    tracker = LineageTracker(run_id=run_id)
+
     # ------------------------------------------------------------------
     # 2. Extract
     # ------------------------------------------------------------------
     extractor = Extractor(source_engine)
     log.info("Extracting POS transactions …")
     pos_df = extractor.extract_pos_transactions(since=since)
+    tracker.record_extraction("pos", rows=len(pos_df), since=since)
 
     log.info("Extracting online orders …")
     online_df = extractor.extract_online_orders(since=since)
+    tracker.record_extraction("online_orders", rows=len(online_df), since=since)
 
     log.info("Extracting feedback surveys …")
     feedback_df = extractor.extract_feedback(since=since)
+    tracker.record_extraction("feedback", rows=len(feedback_df), since=since)
 
     log.info("Extracting inventory snapshot …")
     inventory_df = extractor.extract_inventory(snapshot_date=snapshot_date)
+    tracker.record_extraction("inventory", rows=len(inventory_df), since=None)
 
     # Combine sales for shared processing
     # Tag channel before combining
@@ -187,101 +218,79 @@ def run_pipeline(since: date | None = None) -> None:
         online_df["cashierName"] = None
 
     # ------------------------------------------------------------------
-    # 3. Data quality checks
+    # 3. Data quality checks + anomaly detection
     # ------------------------------------------------------------------
     checker = DataQualityChecker()
+    quality_reports: list[SourceQualityReport] = []
 
-    # POS quality
     if not pos_df.empty:
         alert_mgr_pos = AlertManager()
-        pos_summary = _run_quality_checks(
-            pos_df,
-            "posTransactions",
-            checker,
-            alert_mgr_pos,
-            key_cols=["sourceTransactionId", "productSKU"],
-            date_col="transactionDatetime",
-            discount_col="discountApplied",
+        pos_report = _check_source_quality(
+            pos_df, "posTransactions", checker, alert_mgr_pos, tracker
         )
+        quality_reports.append(pos_report)
         if alert_mgr_pos.to_dict():
-            alert_mgr_pos.flush(pos_summary)
+            alert_mgr_pos.flush(pos_report.to_dict())
 
-    # Online order quality
     if not online_df.empty:
         alert_mgr_online = AlertManager()
-        online_summary = _run_quality_checks(
-            online_df,
-            "onlineOrders",
-            checker,
-            alert_mgr_online,
-            key_cols=["sourceTransactionId", "productSKU"],
-            date_col="transactionDatetime",
-            discount_col="discountApplied",
+        online_report = _check_source_quality(
+            online_df, "onlineOrders", checker, alert_mgr_online, tracker
         )
+        quality_reports.append(online_report)
         if alert_mgr_online.to_dict():
-            alert_mgr_online.flush(online_summary)
+            alert_mgr_online.flush(online_report.to_dict())
 
-    # Feedback quality
     if not feedback_df.empty:
         alert_mgr_fb = AlertManager()
-        _, fb_summary = checker.score_dataframe(
-            feedback_df,
-            "feedback",
-            [
-                (
-                    "null_keys",
-                    lambda d: checker.check_null_keys(
-                        d, ["customerId", "sourceOrderId"]
-                    ),
-                ),
-                (
-                    "date_not_future",
-                    lambda d: checker.check_date_not_future(d, "submissionDate"),
-                ),
-                (
-                    "satisfaction_range",
-                    lambda d: checker.check_score_range(d, "satisfactionScore", 1, 10),
-                ),
-                (
-                    "nps_range",
-                    lambda d: checker.check_score_range(d, "npsScore", 0, 10),
-                ),
-                (
-                    "product_rating_range",
-                    lambda d: checker.check_score_range(d, "productRating", 1, 5),
-                ),
-                (
-                    "delivery_rating_range",
-                    lambda d: checker.check_score_range(d, "deliveryRating", 1, 5),
-                ),
-            ],
+        fb_report = _check_source_quality(
+            feedback_df, "feedback", checker, alert_mgr_fb, tracker
         )
-        fb_summary["table"] = "feedback"
+        quality_reports.append(fb_report)
         if alert_mgr_fb.to_dict():
-            alert_mgr_fb.flush(fb_summary)
+            alert_mgr_fb.flush(fb_report.to_dict())
 
-    # Inventory quality
     if not inventory_df.empty:
         alert_mgr_inv = AlertManager()
-        inv_summary = _run_quality_checks(
-            inventory_df,
-            "inventory",
-            checker,
-            alert_mgr_inv,
-            key_cols=["productSKU"],
+        inv_report = _check_source_quality(
+            inventory_df, "inventory", checker, alert_mgr_inv, tracker
         )
+        quality_reports.append(inv_report)
         if alert_mgr_inv.to_dict():
-            alert_mgr_inv.flush(inv_summary)
+            alert_mgr_inv.flush(inv_report.to_dict())
 
     # ------------------------------------------------------------------
     # 4. Transform
     # ------------------------------------------------------------------
     transformer = Transformer()
 
-    # Cleanse sales dataframes
+    # Cleanse sales dataframes and record how many rows each step dropped
     pos_clean = transformer.cleanse_sales(pos_df) if not pos_df.empty else pos_df
+    tracker.record_cleanse(
+        "pos",
+        rows_before=len(pos_df),
+        rows_after=len(pos_clean),
+        transformations=[
+            "drop_null_keys",
+            "title_case_product_name",
+            "clamp_negative_discount",
+            "recompute_gross_net",
+        ],
+    )
+
     online_clean = (
         transformer.cleanse_sales(online_df) if not online_df.empty else online_df
+    )
+    tracker.record_cleanse(
+        "online_orders",
+        rows_before=len(online_df),
+        rows_after=len(online_clean),
+        transformations=[
+            "drop_null_keys",
+            "title_case_product_name",
+            "clamp_negative_discount",
+            "recompute_gross_net",
+        ],
     )
 
     # Combine for dimension building
@@ -362,7 +371,6 @@ def run_pipeline(since: date | None = None) -> None:
     # ------------------------------------------------------------------
     # 5. Load — within a single transaction
     # ------------------------------------------------------------------
-    tracker = LineageTracker(run_id=run_id)
     loader = Loader(warehouse_engine, tracker)
 
     rows_loaded: dict[str, int] = {}
@@ -454,7 +462,18 @@ def run_pipeline(since: date | None = None) -> None:
     # ------------------------------------------------------------------
     # 6. Save lineage
     # ------------------------------------------------------------------
-    tracker.save(_LINEAGE_DIR)
+    tracker.save(_LINEAGE_DIR)  # raw event log: lineage_<run_id>.json
+    tracker.save_report(_LINEAGE_DIR)  # grouped summary: lineage_report_<run_id>.json
+
+    # ------------------------------------------------------------------
+    # 6b. Quality/anomaly report — save to disk and email
+    # ------------------------------------------------------------------
+    send_pipeline_report(
+        run_id=run_id,
+        quality_reports=[r.to_dict() for r in quality_reports],
+        lineage_report=tracker.to_report(),
+        output_dir=_LINEAGE_DIR,
+    )
 
     # ------------------------------------------------------------------
     # 7. Summary

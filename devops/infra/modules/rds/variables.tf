@@ -52,6 +52,12 @@ variable "deletion_protection" {
   default     = false
 }
 
+variable "publicly_accessible" {
+  description = "Assign a public IP to RDS so it is reachable without a tunnel. Enable in dev only — never in prod."
+  type        = bool
+  default     = false
+}
+
 variable "backup_retention_days" {
   description = "1 for dev, 7 for prod."
   type        = number

@@ -26,6 +26,7 @@ exclude = [
     "data_eng/",
     "qa/data-engineering/conftest\\.py",
     "qa/api-tests/conftest\\.py",
+    "data-engineering/metabase_setup/",
 ]
 
 [tool.bandit]
