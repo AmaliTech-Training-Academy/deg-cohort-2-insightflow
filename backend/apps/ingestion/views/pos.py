@@ -81,5 +81,3 @@ class POSStagingListCreateView(ListCreateAPIView):
             },
             status=status.HTTP_202_ACCEPTED,
         )
-
-

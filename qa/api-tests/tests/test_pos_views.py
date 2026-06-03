@@ -219,5 +219,3 @@ class TestPOSStagingCSVUpload:
             self.view(request)
 
         mt.delay.assert_not_called()
-
-

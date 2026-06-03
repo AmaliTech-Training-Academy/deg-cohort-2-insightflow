@@ -30,6 +30,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
 # When the backend is not running locally these skip gracefully instead of
 # erroring with "fixture not found".
 
+
 @pytest.fixture(scope="session")
 def base_url():
     """
