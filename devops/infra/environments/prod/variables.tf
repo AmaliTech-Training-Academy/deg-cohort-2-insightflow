@@ -1,6 +1,6 @@
 variable "region" {
   type    = string
-  default = "ap-southeast-1"
+  default = "eu-west-1"
 }
 
 variable "app_db_password" {

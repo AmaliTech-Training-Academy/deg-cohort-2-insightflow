@@ -8,7 +8,7 @@ terraform {
   # backend "s3" {
   #   bucket         = "insightflow-tfstate"
   #   key            = "github-oidc/terraform.tfstate"
-  #   region         = "ap-southeast-1"
+  #   region         = "eu-west-1"
   #   dynamodb_table = "insightflow-tfstate-lock"
   #   encrypt        = true
   # }

@@ -1,6 +1,6 @@
 # InsightFlow — Infrastructure Reference
 
-**Region:** `ap-southeast-1` (Singapore)
+**Region:** `eu-west-1` (Singapore)
 **IaC tool:** Terraform ≥ 1.6
 **Environments:** `dev` · `prod`
 **Last updated:** 2026-06-02
@@ -474,7 +474,7 @@ push to main
 
 ## 13. Cost Estimate
 
-Approximate monthly costs in `ap-southeast-1` at on-demand pricing.
+Approximate monthly costs in `eu-west-1` at on-demand pricing.
 
 | Service | Dev | Prod |
 |---|---|---|
@@ -499,7 +499,7 @@ Approximate monthly costs in `ap-southeast-1` at on-demand pricing.
 
 - AWS CLI configured with admin credentials
 - Terraform ≥ 1.6 installed
-- An ACM certificate requested in `ap-southeast-1` for your domain (prod only)
+- An ACM certificate requested in `eu-west-1` for your domain (prod only)
 
 ### Step 1 — Bootstrap Terraform remote state
 
@@ -508,8 +508,8 @@ Create the S3 bucket and DynamoDB lock table once (manually or via a bootstrap s
 ```bash
 aws s3api create-bucket \
   --bucket insightflow-tfstate \
-  --region ap-southeast-1 \
-  --create-bucket-configuration LocationConstraint=ap-southeast-1
+  --region eu-west-1 \
+  --create-bucket-configuration LocationConstraint=eu-west-1
 
 aws s3api put-bucket-versioning \
   --bucket insightflow-tfstate \
@@ -520,7 +520,7 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
-  --region ap-southeast-1
+  --region eu-west-1
 ```
 
 Then uncomment the `backend "s3"` block in `environments/dev/main.tf` and `environments/prod/main.tf`.
@@ -540,7 +540,7 @@ DEV_APP_DB_PASSWORD        <strong-password>
 DEV_WAREHOUSE_DB_PASSWORD  <strong-password>
 PROD_APP_DB_PASSWORD       <strong-password>
 PROD_WAREHOUSE_DB_PASSWORD <strong-password>
-PROD_ACM_CERT_ARN          arn:aws:acm:ap-southeast-1:<account>:certificate/<id>
+PROD_ACM_CERT_ARN          arn:aws:acm:eu-west-1:<account>:certificate/<id>
 ```
 
 ### Step 4 — Deploy dev
@@ -568,7 +568,7 @@ terraform apply
 terraform output ec2_instance_id
 
 # Open an interactive shell — no SSH key needed
-aws ssm start-session --target <instance-id> --region ap-southeast-1
+aws ssm start-session --target <instance-id> --region eu-west-1
 ```
 
 ### Step 7 — Set up GitHub Environment gate (prod)

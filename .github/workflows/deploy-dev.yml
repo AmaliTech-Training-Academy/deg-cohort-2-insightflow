@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION:    ap-southeast-1
+  AWS_REGION:    eu-west-1
   ENV_CONFIG:    devops/scripts/envs/dev.env
   DEPLOY_SCRIPT: devops/scripts/zero-downtime-deploy.sh
   SSM_WAIT:      devops/scripts/ssm-wait.sh
