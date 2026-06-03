@@ -151,8 +151,8 @@ def run() -> None:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as close_exc:  # noqa: BLE001
+                    log.debug("Error closing stale connection: %s", close_exc)
             conn = None
             time.sleep(_RECONNECT_DELAY)
 
