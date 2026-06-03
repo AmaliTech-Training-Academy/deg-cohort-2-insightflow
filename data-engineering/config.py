@@ -38,3 +38,10 @@ WAREHOUSE_DATABASE_URL = (
 
 # Legacy alias — keeps etl_pipeline.py working without changes
 DATABASE_URL = WAREHOUSE_DATABASE_URL
+
+# ── Email reporting (quality/anomaly reports sent after each pipeline run) ────
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+REPORT_EMAIL_TO = os.getenv("REPORT_EMAIL_TO", "okeke.makuochukwu@amalitech.com")
