@@ -65,7 +65,9 @@ class TestOnlineOrdersIngestionService:
         assert job.trigger == OnlineInjectionJob.TriggerChoices.MANUAL
 
     def test_process_job_completes_on_success(self, service):
-        with patch("apps.ingestion.services.online_orders_service.iter_all_pages") as mock_pages:
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
             mock_pages.return_value = iter([[VALID_ORDER]])
             job = service.create_job()
             service.process_job(job)
@@ -74,7 +76,9 @@ class TestOnlineOrdersIngestionService:
             assert job.pages_fetched == 1
 
     def test_process_job_marks_failed_on_api_error(self, service):
-        with patch("apps.ingestion.services.online_orders_service.iter_all_pages") as mock_pages:
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
             mock_pages.side_effect = OnlineOrdersAPIError("connection failed")
             job = service.create_job()
             with pytest.raises(OnlineOrdersAPIError):
@@ -86,7 +90,9 @@ class TestOnlineOrdersIngestionService:
     def test_upsert_creates_customer_if_missing(self, service):
         from apps.ingestion.models.base import Customer
 
-        with patch("apps.ingestion.services.online_orders_service.iter_all_pages") as mock_pages:
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
             mock_pages.return_value = iter([[VALID_ORDER]])
             service.process_job(service.create_job())
         assert Customer.objects.filter(customerId="CUST-000001").exists()
@@ -94,7 +100,9 @@ class TestOnlineOrdersIngestionService:
     def test_upsert_creates_product_if_missing(self, service):
         from apps.ingestion.models.inventory import Product
 
-        with patch("apps.ingestion.services.online_orders_service.iter_all_pages") as mock_pages:
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
             mock_pages.return_value = iter([[VALID_ORDER]])
             service.process_job(service.create_job())
         assert Product.objects.filter(productSKU="PROD-0000028").exists()
@@ -102,12 +110,16 @@ class TestOnlineOrdersIngestionService:
     def test_upsert_updates_order_status(self, service):
         from apps.ingestion.models.online_orders import OnlineOrder
 
-        with patch("apps.ingestion.services.online_orders_service.iter_all_pages") as mock_pages:
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
             mock_pages.return_value = iter([[VALID_ORDER]])
             service.process_job(service.create_job())
 
         updated = {**VALID_ORDER, "orderStatus": "delivered"}
-        with patch("apps.ingestion.services.online_orders_service.iter_all_pages") as mock_pages:
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
             mock_pages.return_value = iter([[updated]])
             service.process_job(service.create_job())
 

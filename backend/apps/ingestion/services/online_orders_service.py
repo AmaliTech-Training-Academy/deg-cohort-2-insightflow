@@ -39,7 +39,9 @@ class OnlineOrdersIngestionService:
         try:
             for page_data in iter_all_pages(limit=_PAGE_LIMIT):
                 pages += 1
-                page_valid, page_errors, page_err_details = self._process_page(page_data, job)
+                page_valid, page_errors, page_err_details = self._process_page(
+                    page_data, job
+                )
                 total += len(page_data)
                 valid += page_valid
                 errors += page_errors
@@ -61,7 +63,12 @@ class OnlineOrdersIngestionService:
             job.status = OnlineInjectionJob.StatusChoices.COMPLETED
             job.error_report = {"order_errors": all_errors} if all_errors else {}
             job.save(update_fields=["status", "error_report"])
-            logger.info("OnlineInjectionJob %s completed — valid=%s errors=%s", job.id, valid, errors)
+            logger.info(
+                "OnlineInjectionJob %s completed — valid=%s errors=%s",
+                job.id,
+                valid,
+                errors,
+            )
 
         except OnlineOrdersAPIError as exc:
             logger.exception("OnlineInjectionJob %s failed: %s", job.id, exc)
@@ -82,7 +89,10 @@ class OnlineOrdersIngestionService:
                 if order_errors:
                     errors += 1
                     err_details.append(
-                        {"order_id": order_dict.get("onlineOrderId"), "errors": order_errors}
+                        {
+                            "order_id": order_dict.get("onlineOrderId"),
+                            "errors": order_errors,
+                        }
                     )
                     continue
                 try:
@@ -102,7 +112,10 @@ class OnlineOrdersIngestionService:
     def _upsert_order(self, order_dict: dict[str, Any]) -> None:
         dt = parse_datetime(str(order_dict["orderDatetime"]))
         if dt is None:
-            logger.warning("Unparseable orderDatetime for order %s — skipping", order_dict.get("onlineOrderId"))
+            logger.warning(
+                "Unparseable orderDatetime for order %s — skipping",
+                order_dict.get("onlineOrderId"),
+            )
             return
 
         customer, _ = Customer.objects.get_or_create(

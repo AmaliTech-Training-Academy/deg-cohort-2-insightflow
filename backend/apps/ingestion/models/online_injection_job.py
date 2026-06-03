@@ -25,7 +25,7 @@ class OnlineInjectionJob(models.Model):
     valid_orders = models.IntegerField(default=0)
     error_orders = models.IntegerField(default=0)
     pages_fetched = models.IntegerField(default=0)
-    error_report: dict[str, Any] | None = models.JSONField(null=True, blank=True)  # type: ignore[assignment]
+    error_report: dict[str, Any] | None = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

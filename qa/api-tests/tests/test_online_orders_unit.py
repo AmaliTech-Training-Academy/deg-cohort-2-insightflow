@@ -34,7 +34,13 @@ VALID_LINE: dict = {
     "totalAmount": "1796.28",
 }
 
-_PAGE_1: dict = {"page": 1, "limit": 100, "totalOrders": 1, "totalPages": 1, "data": [VALID_ORDER]}
+_PAGE_1: dict = {
+    "page": 1,
+    "limit": 100,
+    "totalOrders": 1,
+    "totalPages": 1,
+    "data": [VALID_ORDER],
+}
 
 
 class TestOnlineOrderValidator:
@@ -77,9 +83,10 @@ class TestOnlineOrderConnector:
     def test_fetch_page_success(self):
         mock_resp = MagicMock()
         mock_resp.json.return_value = _PAGE_1
-        with patch(
-            "apps.ingestion.connectors.online_orders.requests.get"
-        ) as mock_get, patch.dict("os.environ", {"ONLINE_ORDERS_API_URL": "https://example.com"}):
+        with (
+            patch("apps.ingestion.connectors.online_orders.requests.get") as mock_get,
+            patch.dict("os.environ", {"ONLINE_ORDERS_API_URL": "https://example.com"}),
+        ):
             mock_get.return_value = mock_resp
             result = fetch_orders_page(page=1)
             assert result["totalPages"] == 1
@@ -88,17 +95,19 @@ class TestOnlineOrderConnector:
     def test_fetch_page_raises_on_http_error(self):
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = _requests.exceptions.HTTPError("500")
-        with patch(
-            "apps.ingestion.connectors.online_orders.requests.get"
-        ) as mock_get, patch.dict("os.environ", {"ONLINE_ORDERS_API_URL": "https://example.com"}):
+        with (
+            patch("apps.ingestion.connectors.online_orders.requests.get") as mock_get,
+            patch.dict("os.environ", {"ONLINE_ORDERS_API_URL": "https://example.com"}),
+        ):
             mock_get.return_value = mock_resp
             with pytest.raises(OnlineOrdersAPIError):
                 fetch_orders_page(page=1)
 
     def test_fetch_page_raises_on_network_error(self):
-        with patch(
-            "apps.ingestion.connectors.online_orders.requests.get"
-        ) as mock_get, patch.dict("os.environ", {"ONLINE_ORDERS_API_URL": "https://example.com"}):
+        with (
+            patch("apps.ingestion.connectors.online_orders.requests.get") as mock_get,
+            patch.dict("os.environ", {"ONLINE_ORDERS_API_URL": "https://example.com"}),
+        ):
             mock_get.side_effect = _requests.exceptions.ConnectionError("refused")
             with pytest.raises(OnlineOrdersAPIError):
                 fetch_orders_page(page=1)
@@ -109,14 +118,18 @@ class TestOnlineOrderConnector:
                 fetch_orders_page(page=1)
 
     def test_iter_all_pages_single_page(self):
-        with patch("apps.ingestion.connectors.online_orders.fetch_orders_page") as mock_fetch:
+        with patch(
+            "apps.ingestion.connectors.online_orders.fetch_orders_page"
+        ) as mock_fetch:
             mock_fetch.return_value = _PAGE_1
             pages = list(iter_all_pages())
             assert len(pages) == 1
             mock_fetch.assert_called_once_with(page=1, limit=100)
 
     def test_iter_all_pages_multiple_pages(self):
-        with patch("apps.ingestion.connectors.online_orders.fetch_orders_page") as mock_fetch:
+        with patch(
+            "apps.ingestion.connectors.online_orders.fetch_orders_page"
+        ) as mock_fetch:
             mock_fetch.side_effect = [
                 {**_PAGE_1, "totalPages": 3},
                 {**_PAGE_1, "page": 2, "totalPages": 3},

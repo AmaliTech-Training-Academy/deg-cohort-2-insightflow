@@ -1,5 +1,10 @@
-# sales_dashboard_views.py
+# sales/views.py
+"""
+SQL Views for Sales & Revenue tab
+"""
+
 VIEWS_SQL = """
+-- KPI summary
 CREATE OR REPLACE VIEW v_kpi_summary AS
 SELECT
     SUM(f."netAmount")              AS total_revenue,
@@ -10,24 +15,29 @@ SELECT
 FROM "factSales" f
 JOIN "dimDate" d ON f."dateKey" = d."dateKey";
 
+-- Daily revenue
 CREATE OR REPLACE VIEW v_daily_revenue AS
 SELECT
-    d."fullDate"         AS date,
-    SUM(f."netAmount")   AS daily_revenue
+    d."fullDate"       AS date,
+    SUM(f."netAmount") AS daily_revenue,
+    COUNT(f."salesKey") AS transactions
 FROM "factSales" f
 JOIN "dimDate" d ON f."dateKey" = d."dateKey"
 GROUP BY d."fullDate"
 ORDER BY d."fullDate";
 
+-- Monthly revenue
 CREATE OR REPLACE VIEW v_monthly_revenue AS
 SELECT
     MAKE_DATE(d."year", d."month", 1) AS month_start,
-    SUM(f."netAmount")                AS monthly_revenue
+    SUM(f."netAmount")                AS monthly_revenue,
+    COUNT(f."salesKey")               AS transactions
 FROM "factSales" f
 JOIN "dimDate" d ON f."dateKey" = d."dateKey"
 GROUP BY d."year", d."month"
 ORDER BY d."year", d."month";
 
+-- Weekly summary
 CREATE OR REPLACE VIEW v_weekly_summary AS
 SELECT
     MIN(d."fullDate")               AS week_start,
