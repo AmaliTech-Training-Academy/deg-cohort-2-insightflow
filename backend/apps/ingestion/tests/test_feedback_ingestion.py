@@ -6,10 +6,9 @@ Covers:
 - Retry behaviour on connector failure
 - Ingestion summary output
 """
+
 import logging
 from unittest.mock import MagicMock, patch
-
-from django.test import TestCase
 
 from apps.authentication.models import User
 from apps.ingestion.models.base import Customer
@@ -17,6 +16,7 @@ from apps.ingestion.models.feedback import FeedbackSurvey
 from apps.ingestion.models.online_orders import OnlineOrder
 from apps.ingestion.services.feedback_ingestion_service import FeedbackIngestionService
 from apps.ingestion.tasks.ingest_feedback import ingest_feedback
+from django.test import TestCase
 
 
 def _make_record(**overrides) -> dict:
@@ -148,9 +148,9 @@ class FeedbackIngestionSummaryTest(TestCase):
         summary = service.ingest()
 
         self.assertEqual(summary["total_fetched"], 3)
-        self.assertEqual(summary["created"], 1)        # responseId=2 is new
+        self.assertEqual(summary["created"], 1)  # responseId=2 is new
         self.assertEqual(summary["skipped_duplicates"], 1)  # responseId=1 exists
-        self.assertEqual(summary["errors"], 1)         # CUST-MISSING
+        self.assertEqual(summary["errors"], 1)  # CUST-MISSING
 
     def test_summary_is_logged(self):
         connector = MagicMock()
@@ -161,7 +161,9 @@ class FeedbackIngestionSummaryTest(TestCase):
         with self.assertLogs(logger_name, level=logging.INFO) as log_ctx:
             service.ingest()
 
-        self.assertTrue(any("Feedback ingestion complete" in line for line in log_ctx.output))
+        self.assertTrue(
+            any("Feedback ingestion complete" in line for line in log_ctx.output)
+        )
 
 
 class FeedbackIngestionRetryTest(TestCase):
@@ -181,7 +183,7 @@ class FeedbackIngestionRetryTest(TestCase):
             instance.ingest.assert_called_once()
 
     def test_task_calls_retry_on_failure(self):
-        """Verify the task delegates to self.retry() rather than swallowing the error."""
+        """Verify the task delegates to self.retry() rather than swallowing errors."""
         with patch(
             "apps.ingestion.tasks.ingest_feedback.FeedbackIngestionService"
         ) as MockService:

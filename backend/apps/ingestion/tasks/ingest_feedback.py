@@ -20,4 +20,4 @@ def ingest_feedback(self) -> dict:
         return service.ingest()
     except Exception as exc:
         logger.error(f"Feedback ingestion failed — retrying. Error: {exc}")
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
+        raise self.retry(exc=exc, countdown=60 * (2**self.request.retries))

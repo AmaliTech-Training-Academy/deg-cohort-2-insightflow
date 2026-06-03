@@ -31,10 +31,16 @@ class FeedbackAPIConnector:
         records = list(payload.get("data", []))
         total_pages = payload.get("totalPages", 1)
         for page in range(2, total_pages + 1):
-            resp = requests.get(feedbacks_url, params={"page": page, "limit": 100}, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(
+                feedbacks_url,
+                params={"page": page, "limit": 100},
+                timeout=REQUEST_TIMEOUT,
+            )
             resp.raise_for_status()
             body = resp.json()
             records.extend(body.get("data", []))
 
-        logger.debug(f"Feedback API fetched {len(records)} records across {total_pages} pages")
+        logger.debug(
+            f"Feedback API fetched {len(records)} records across {total_pages} pages"
+        )
         return records

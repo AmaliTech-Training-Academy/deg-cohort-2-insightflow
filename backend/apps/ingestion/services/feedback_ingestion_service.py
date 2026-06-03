@@ -1,8 +1,8 @@
 import logging
 
 from ..connectors.feedback import FeedbackAPIConnector
-from ..models.feedback import FeedbackSurvey
 from ..models.base import Customer
+from ..models.feedback import FeedbackSurvey
 from ..models.online_orders import OnlineOrder
 
 logger = logging.getLogger(__name__)
@@ -34,10 +34,12 @@ class FeedbackIngestionService:
                 else:
                     skipped_count += 1
             except Exception as exc:
-                error_details.append({
-                    "responseId": record.get("responseId"),
-                    "error": str(exc),
-                })
+                error_details.append(
+                    {
+                        "responseId": record.get("responseId"),
+                        "error": str(exc),
+                    }
+                )
 
         summary = {
             "total_fetched": total,
