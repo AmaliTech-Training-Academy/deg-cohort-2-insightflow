@@ -385,17 +385,19 @@ stdlib `smtplib` — no extra packages are required.
 
 ### Environment variables
 
-| Variable | Description | Default |
+| Variable | Description | Current value |
 |---|---|---|
-| `SMTP_HOST` | SMTP server hostname | `smtp.gmail.com` |
-| `SMTP_PORT` | SMTP port (STARTTLS) | `587` |
-| `SMTP_USER` | Sender address (**required to enable email**) | — |
-| `SMTP_PASSWORD` | Sender password or app token | — |
-| `REPORT_EMAIL_TO` | Recipient address | `okeke.makuochukwu@amalitech.com` |
+| `SMTP_HOST` | SMTP server hostname | `pro.turbo-smtp.com` |
+| `SMTP_PORT` | SMTP port (SSL) | `465` |
+| `SMTP_USER` | TurboSMTP API key (**required to enable email**) | set in `.env` |
+| `SMTP_PASSWORD` | TurboSMTP API secret | set in `.env` |
+| `SMTP_FROM` | Verified sender address | `okeke.makuochukwu@amalitechtraining.org` |
+| `REPORT_EMAIL_TO` | Report recipient address | `okeke.makuochukwu@amalitech.com` |
 
-> **Gmail users:** generate an **App Password** at  
-> Google Account → Security → 2-Step Verification → App Passwords  
-> and set it as `SMTP_PASSWORD`.
+> **TurboSMTP note:** `SMTP_USER` and `SMTP_PASSWORD` are the API credentials
+> from your TurboSMTP account. `SMTP_FROM` must be a sender address verified
+> in your TurboSMTP account — it is separate from the API key used for auth.
+> Port 465 uses implicit SSL (`SMTP_SSL`); port 587 uses STARTTLS.
 
 ### Report attachment contents
 
