@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -12,7 +13,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
-AUTH_USER_MODEL = "authentication.User"
+AUTH_USER_MODEL = "apps.authentication.User"
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -131,6 +132,14 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_TASK_EXPIRES = 3600  # task results expire after 1 hour — prevent Redis OOM
 CELERY_RESULT_EXPIRES = 3600
+
+ONLINE_ORDERS_API_URL = os.environ.get("ONLINE_ORDERS_API_URL", "")
+CELERY_BEAT_SCHEDULE = {
+    "fetch-online-orders-every-2-hours": {
+        "task": "apps.ingestion.tasks.fetch_online_orders.schedule_online_orders_fetch",
+        "schedule": crontab(minute=0, hour="*/2"),
+    },
+}
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
