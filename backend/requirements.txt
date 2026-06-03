@@ -7,4 +7,6 @@ psycopg2-binary
 python-dotenv==1.2.2
 gunicorn==22.0.0
 Faker==24.6.0
+celery[redis]==5.4.0
+pandas==2.2.3
 python-json-logger==2.0.7

@@ -62,6 +62,9 @@ services:
       DB_USER: insightflow
       DB_PASSWORD: insightflow_pass
       REDIS_URL: redis://redis:6379/0
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media-data:/app/media
     depends_on:
       postgres-app:
         condition: service_healthy
@@ -71,6 +74,33 @@ services:
       sh -c "python manage.py migrate &&
              python manage.py seed_data &&
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: insightflow-celery-worker
+    environment:
+      DJANGO_SETTINGS_MODULE: insightflow.settings.prod
+      DJANGO_SECRET_KEY: change-me-in-production-use-a-long-random-string
+      DEBUG: "False"
+      DB_HOST: postgres-app
+      DB_PORT: "5432"
+      DB_NAME: insightflow_app
+      DB_USER: insightflow
+      DB_PASSWORD: insightflow_pass
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media-data:/app/media
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: celery -A insightflow worker --loglevel=info --concurrency=2
 
   etl:
     build:
@@ -98,3 +128,4 @@ volumes:
   pgdata-app:
   pgdata-warehouse:
   redis-data:
+  media-data:
