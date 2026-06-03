@@ -23,9 +23,7 @@ class TestRegisterPage:
     def test_password_hint_visible(self, page: Page, base_url: str):
         page.goto(f"{base_url}/register")
         expect(
-            page.locator(
-                "text=Use 8+ chars with mixed case, a number or symbol."
-            )
+            page.locator("text=Use 8+ chars with mixed case, a number or symbol.")
         ).to_be_visible()
 
     def test_sign_in_link_goes_to_login(self, page: Page, base_url: str):

@@ -37,9 +37,7 @@ class TestLoginPage:
             page.locator("text=Please enter your email and password.")
         ).to_be_visible()
 
-    def test_forgot_password_link_goes_to_correct_page(
-        self, page: Page, base_url: str
-    ):
+    def test_forgot_password_link_goes_to_correct_page(self, page: Page, base_url: str):
         page.goto(f"{base_url}/login")
         page.click("text=Forgot password?")
         expect(page).to_have_url(f"{base_url}/forgot-password")
@@ -49,9 +47,7 @@ class TestLoginPage:
         page.click("text=Register")
         expect(page).to_have_url(f"{base_url}/register")
 
-    def test_successful_login_redirects_to_dashboard(
-        self, page: Page, base_url: str
-    ):
+    def test_successful_login_redirects_to_dashboard(self, page: Page, base_url: str):
         page.goto(f"{base_url}/login")
         page.fill("#email", "user@insightflow.io")
         page.fill("#password", "Password1!")

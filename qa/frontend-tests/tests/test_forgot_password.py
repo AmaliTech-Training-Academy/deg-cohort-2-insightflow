@@ -40,17 +40,13 @@ class TestForgotPasswordPage:
         page.click("button[type='submit']")
         expect(page.locator("h2")).to_have_text("Check your inbox")
 
-    def test_success_state_displays_submitted_email(
-        self, page: Page, base_url: str
-    ):
+    def test_success_state_displays_submitted_email(self, page: Page, base_url: str):
         page.goto(f"{base_url}/forgot-password")
         page.fill("#email", "user@insightflow.io")
         page.click("button[type='submit']")
         expect(page.locator("text=user@insightflow.io")).to_be_visible()
 
-    def test_try_another_address_returns_to_form(
-        self, page: Page, base_url: str
-    ):
+    def test_try_another_address_returns_to_form(self, page: Page, base_url: str):
         page.goto(f"{base_url}/forgot-password")
         page.fill("#email", "user@insightflow.io")
         page.click("button[type='submit']")
