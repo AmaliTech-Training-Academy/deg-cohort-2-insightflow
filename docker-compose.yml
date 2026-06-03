@@ -127,7 +127,6 @@ services:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl
-    env_file: .env
     environment:
       DB_HOST: ${WAREHOUSE_DB_HOST:-postgres-warehouse}
       DB_PORT: ${WAREHOUSE_DB_PORT:-5432}
@@ -135,6 +134,7 @@ services:
       DB_USER: ${WAREHOUSE_DB_USER:-insightflow_wh}
       DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD:-insightflow_wh_pass}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/1}
+      ETL_BATCH_SIZE: ${ETL_BATCH_SIZE:-1000}
     depends_on:
       redis:
         condition: service_healthy
@@ -142,20 +142,20 @@ services:
       sh -c "python create_star_schema.py &&
              python etl_pipeline.py"
 
-  # ── Event-driven ETL ────────────────────────────────────────────────────────
-  # Watches the OLTP source DB for new data via PostgreSQL NOTIFY.
-  # On notification: debounces for ETL_DEBOUNCE_SECONDS then dispatches
-  # run_etl_task to the Celery queue.  Starts by installing the DB triggers.
   etl-listener:
     image: insightflow-etl:${DEPLOY_TAG:-local}
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl-listener
-    env_file: .env
     environment:
-      REDIS_URL: redis://redis:6379/1
-      ETL_DEBOUNCE_SECONDS: "300"
+      DB_HOST: ${DB_HOST:-postgres-app}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-insightflow_app}
+      DB_USER: ${DB_USER:-insightflow}
+      DB_PASSWORD: ${DB_PASSWORD:-insightflow_pass}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/1}
+      ETL_DEBOUNCE_SECONDS: ${ETL_DEBOUNCE_SECONDS:-300}
     depends_on:
       redis:
         condition: service_healthy
@@ -164,17 +164,19 @@ services:
       sh -c "python trigger_setup.py install &&
              python -m etl.listener"
 
-  # Celery worker — picks up run_etl_task from the Redis queue and executes
-  # the incremental ETL pipeline (OLTP → quality checks → OLAP warehouse).
   etl-worker:
     image: insightflow-etl:${DEPLOY_TAG:-local}
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl-worker
-    env_file: .env
     environment:
-      REDIS_URL: redis://redis:6379/1
+      DB_HOST: ${WAREHOUSE_DB_HOST:-postgres-warehouse}
+      DB_PORT: ${WAREHOUSE_DB_PORT:-5432}
+      DB_NAME: ${WAREHOUSE_DB_NAME:-insightflow_warehouse}
+      DB_USER: ${WAREHOUSE_DB_USER:-insightflow_wh}
+      DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD:-insightflow_wh_pass}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/1}
     depends_on:
       redis:
         condition: service_healthy
