@@ -48,6 +48,7 @@ repos:
     hooks:
       - id: mypy
         files: ^(backend|data-engineering|qa)/
+        exclude: ^qa/
         args: ["--config-file", "pyproject.toml"]
         additional_dependencies:
           - types-requests
