@@ -119,8 +119,23 @@ DEPLOY_TAG="$DEPLOY_TAG" $COMPOSE build \
 log "Build complete"
 
 # ── 4. Canary pre-flight ──────────────────────────────────────────────────────
-# Ensure the compose network exists before the canary starts (first deploy).
-docker network create "${PROJECT}_default" 2>/dev/null || true
+# Ensure the compose network exists with the correct Compose-managed labels.
+# If it exists without labels (manually created), remove and recreate it.
+EXISTING_NET=$(docker network ls --filter "name=^${PROJECT}_default$" --format "{{.ID}}" 2>/dev/null)
+if [[ -n "$EXISTING_NET" ]]; then
+  NET_LABEL=$(docker network inspect "$EXISTING_NET" \
+    --format '{{index .Labels "com.docker.compose.network"}}' 2>/dev/null)
+  if [[ "$NET_LABEL" != "default" ]]; then
+    log "Removing unmanaged network ${PROJECT}_default to let Compose recreate it"
+    docker network rm "$EXISTING_NET" 2>/dev/null || true
+  fi
+fi
+COMPOSE_VER=$(docker compose version --short 2>/dev/null || echo "")
+docker network create \
+  --label "com.docker.compose.network=default" \
+  --label "com.docker.compose.project=${PROJECT}" \
+  --label "com.docker.compose.version=${COMPOSE_VER}" \
+  "${PROJECT}_default" 2>/dev/null || true
 
 log "Starting canary on port ${CANARY_PORT}..."
 docker rm -f insightflow-canary 2>/dev/null || true
