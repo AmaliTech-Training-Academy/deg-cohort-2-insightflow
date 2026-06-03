@@ -144,6 +144,8 @@ SIMPLE_JWT = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+EXTERNAL_API_BASE_URL = os.environ.get("EXTERNAL_API_BASE_URL", "")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
