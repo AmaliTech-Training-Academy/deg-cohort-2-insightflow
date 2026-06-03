@@ -1,3 +1,5 @@
+from typing import Any
+
 from apps.authentication.models import User
 from django.db import models
 
@@ -30,6 +32,7 @@ class InjectionJob(models.Model):
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"
 
+    id: int  # explicit annotation so Pylance can resolve the auto-generated PK
     file = models.FileField(upload_to="uploads/pos_csv/%Y/%m/%d/")
     status = models.CharField(
         max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING
@@ -39,7 +42,7 @@ class InjectionJob(models.Model):
     )
     valid_rows = models.IntegerField(default=0)
     error_rows = models.IntegerField(default=0)
-    error_report = models.JSONField(
+    error_report: dict[str, Any] | None = models.JSONField(  # type: ignore[assignment]
         null=True, blank=True, help_text="Detailed error logs filled after processing"
     )
     created_at = models.DateTimeField(auto_now_add=True)

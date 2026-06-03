@@ -18,19 +18,20 @@ class IngestionJobStatusView(APIView):
     Client polls this after receiving 202 from the upload endpoint.
     404 if job_id does not exist.
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request, job_id):
         job = get_object_or_404(InjectionJob, id=job_id)
 
         response = {
-            'job_id':     job.id,
-            'status':     job.status,
-            'total_rows': job.total_rows,
-            'valid_rows': job.valid_rows,
-            'error_rows': job.error_rows,
-            'created_at': job.created_at,
-            'updated_at': job.updated_at,
+            "job_id": job.id,
+            "status": job.status,
+            "total_rows": job.total_rows,
+            "valid_rows": job.valid_rows,
+            "error_rows": job.error_rows,
+            "created_at": job.created_at,
+            "updated_at": job.updated_at,
         }
 
         # attach error report only when job is done
@@ -39,6 +40,6 @@ class IngestionJobStatusView(APIView):
             InjectionJob.StatusChoices.FAILED,
         ]:
             if job.error_report:
-                response['error_report'] = job.error_report
+                response["error_report"] = job.error_report
 
         return Response(response)

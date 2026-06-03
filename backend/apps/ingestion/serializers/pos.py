@@ -7,10 +7,10 @@ class PosTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PosTransaction
         fields = [
-            'posTransactionId',
-            'storeId',
-            'cashierId',
-            'transactionDatetime',
+            "posTransactionId",
+            "storeId",
+            "cashierId",
+            "transactionDatetime",
         ]
 
 
@@ -18,11 +18,11 @@ class PosTransactionLineSerializer(serializers.ModelSerializer):
     class Meta:
         model = PosTransactionLine
         fields = [
-            'lineId',
-            'posTransactionId',
-            'productSKU',
-            'quantity',
-            'unitPrice',
-            'discountApplied',
-            'totalAmount',
+            "lineId",
+            "posTransactionId",
+            "productSKU",
+            "quantity",
+            "unitPrice",
+            "discountApplied",
+            "totalAmount",
         ]

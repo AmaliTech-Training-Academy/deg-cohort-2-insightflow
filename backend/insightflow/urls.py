@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -8,6 +8,9 @@ from drf_spectacular.views import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Ingestion endpoints
+    path("api/ingestion/", include("apps.ingestion.urls")),
+    # API documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api-docs/",

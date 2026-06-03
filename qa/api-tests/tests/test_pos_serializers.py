@@ -5,18 +5,17 @@ Tests PosTransactionSerializer and PosTransactionLineSerializer for correct
 field inclusion, value mapping, and many=True behaviour.
 """
 
-import pytest
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.utils import timezone
-
+import pytest
 from apps.ingestion.models.inventory import Category, Product, Store
 from apps.ingestion.models.pos import Cashier, PosTransaction, PosTransactionLine
 from apps.ingestion.serializers.pos import (
-    PosTransactionSerializer,
     PosTransactionLineSerializer,
+    PosTransactionSerializer,
 )
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -45,7 +44,12 @@ class TestPosTransactionSerializer:
             transactionDatetime=timezone.now(),
         )
         data = PosTransactionSerializer(txn).data
-        for field in ["posTransactionId", "storeId", "cashierId", "transactionDatetime"]:
+        for field in [
+            "posTransactionId",
+            "storeId",
+            "cashierId",
+            "transactionDatetime",
+        ]:
             assert field in data
 
     def test_posTransactionId_value_correct(self):
@@ -120,7 +124,9 @@ class TestPosTransactionLineSerializer:
             productSKU="PROD-0000001", productName="Laptop", categoryId=self.category
         )
 
-    def _make_line(self, line_id=1, quantity=2, unit_price="25.00", discount="0.00", total="50.00"):
+    def _make_line(
+        self, line_id=1, quantity=2, unit_price="25.00", discount="0.00", total="50.00"
+    ):
         return PosTransactionLine.objects.create(
             lineId=line_id,
             posTransactionId=self.transaction,
@@ -136,8 +142,13 @@ class TestPosTransactionLineSerializer:
         line = self._make_line()
         data = PosTransactionLineSerializer(line).data
         for field in [
-            "lineId", "posTransactionId", "productSKU",
-            "quantity", "unitPrice", "discountApplied", "totalAmount",
+            "lineId",
+            "posTransactionId",
+            "productSKU",
+            "quantity",
+            "unitPrice",
+            "discountApplied",
+            "totalAmount",
         ]:
             assert field in data
 

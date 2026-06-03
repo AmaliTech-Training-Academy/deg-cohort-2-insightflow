@@ -7,22 +7,22 @@ no live server or URL routing is required.
 """
 
 import io
-import pytest
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth import get_user_model
-from django.utils import timezone
-from rest_framework.test import APIRequestFactory, force_authenticate
-
+import pytest
 from apps.ingestion.models.inventory import Category, Product, Store
 from apps.ingestion.models.pos import Cashier, PosTransaction, PosTransactionLine
 from apps.ingestion.views.pos import POSStagingDetailView, POSStagingListCreateView
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 User = get_user_model()
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _csv_file(rows=1):
     """Return an in-memory CSV file with `rows` data rows."""
@@ -49,6 +49,7 @@ def _mock_job(job_id=1, total_rows=1):
 
 
 # ── list / create view ────────────────────────────────────────────────────────
+
 
 @pytest.mark.django_db
 class TestPOSStagingListView:
@@ -93,6 +94,7 @@ class TestPOSStagingListView:
 
 # ── CSV upload ────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestPOSStagingCSVUpload:
     """Tests for POST /api/ingestion/pos/ with a CSV file."""
@@ -111,9 +113,11 @@ class TestPOSStagingCSVUpload:
         if mock_job is None:
             mock_job = _mock_job()
 
-        with patch("apps.ingestion.views.pos.service.validate_upload") as mv, \
-             patch("apps.ingestion.views.pos.service.accept_upload") as ma, \
-             patch("apps.ingestion.views.pos.process_pos_file") as mt:
+        with (
+            patch("apps.ingestion.views.pos.service.validate_upload") as mv,
+            patch("apps.ingestion.views.pos.service.accept_upload") as ma,
+            patch("apps.ingestion.views.pos.process_pos_file") as mt,
+        ):
 
             mv.return_value = mock_validate_result
             ma.return_value = mock_job
@@ -205,8 +209,10 @@ class TestPOSStagingCSVUpload:
 
     def test_celery_not_called_when_validation_fails(self):
         """Celery task must NOT be dispatched when validation fails."""
-        with patch("apps.ingestion.views.pos.service.validate_upload") as mv, \
-             patch("apps.ingestion.views.pos.process_pos_file") as mt:
+        with (
+            patch("apps.ingestion.views.pos.service.validate_upload") as mv,
+            patch("apps.ingestion.views.pos.process_pos_file") as mt,
+        ):
 
             mv.return_value = {"ok": False, "error": "Bad file"}
             mt.delay.return_value = None
@@ -222,6 +228,7 @@ class TestPOSStagingCSVUpload:
 
 # ── detail view ───────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestPOSStagingDetailView:
     """Tests for GET / PATCH / DELETE /api/ingestion/pos/<pk>/."""
@@ -234,7 +241,9 @@ class TestPOSStagingDetailView:
         self.view = POSStagingDetailView.as_view()
 
         # Build a full PosTransactionLine fixture
-        store = Store.objects.create(storeId=1, storeName="Test Store", province="Ontario")
+        store = Store.objects.create(
+            storeId=1, storeName="Test Store", province="Ontario"
+        )
         cashier = Cashier.objects.create(
             cashierId=1, storeId=store, fullName="Test Cashier", userId=self.user
         )

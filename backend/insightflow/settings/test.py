@@ -16,6 +16,6 @@ DATABASES = {
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 # Silence migration output
-MIGRATION_MODULES = {}
+MIGRATION_MODULES: dict[str, str] = {}
 
 MEDIA_ROOT = "/tmp/insightflow_test_media"
