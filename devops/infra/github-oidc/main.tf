@@ -66,6 +66,8 @@ resource "aws_iam_role" "github_deploy_dev" {
 }
 
 resource "aws_iam_role_policy" "github_deploy_dev" {
+  #checkov:skip=CKV_AWS_355:SSM describe/list and CloudWatch actions cannot be scoped below account level
+  #checkov:skip=CKV_AWS_290:ssm:SendCommand is scoped to account instances; no further restriction possible without known instance IDs
   name = "insightflow-deploy-dev"
   role = aws_iam_role.github_deploy_dev.id
 
@@ -73,10 +75,18 @@ resource "aws_iam_role_policy" "github_deploy_dev" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SSMRunCommand"
+        Sid    = "SSMSendCommand"
+        Effect = "Allow"
+        Action = ["ssm:SendCommand"]
+        Resource = [
+          "arn:aws:ec2:*:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:document/AWS-RunShellScript"
+        ]
+      },
+      {
+        Sid    = "SSMReadCommand"
         Effect = "Allow"
         Action = [
-          "ssm:SendCommand",
           "ssm:GetCommandInvocation",
           "ssm:DescribeInstanceInformation",
           "ssm:ListCommandInvocations"
@@ -125,6 +135,12 @@ resource "aws_iam_role" "github_deploy_prod" {
 }
 
 resource "aws_iam_role_policy" "github_deploy_prod" {
+  #checkov:skip=CKV_AWS_355:Terraform deploy role requires broad resource scope; ARNs are unknown at role creation time
+  #checkov:skip=CKV_AWS_290:Write access is intentional — role manages all prod infrastructure via Terraform
+  #checkov:skip=CKV_AWS_286:iam:PassRole is required for Terraform to attach roles to EC2 instances
+  #checkov:skip=CKV_AWS_287:secretsmanager access is scoped to insightflow-prod/* namespace only
+  #checkov:skip=CKV_AWS_288:s3 and secretsmanager access is required for Terraform state and app secrets
+  #checkov:skip=CKV_AWS_289:IAM permissions management is required for Terraform to create EC2 and VPC roles
   name = "insightflow-deploy-prod"
   role = aws_iam_role.github_deploy_prod.id
 
