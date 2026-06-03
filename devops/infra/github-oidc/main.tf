@@ -58,7 +58,7 @@ resource "aws_iam_role" "github_deploy_dev" {
           "${local.oidc_host}:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "${local.oidc_host}:sub" = "repo:${local.repo}:ref:refs/heads/dev"
+          "${local.oidc_host}:sub" = "repo:${local.repo}:environment:dev"
         }
       }
     }]
@@ -80,7 +80,7 @@ resource "aws_iam_role_policy" "github_deploy_dev" {
         Action = ["ssm:SendCommand"]
         Resource = [
           "arn:aws:ec2:*:${data.aws_caller_identity.current.account_id}:instance/*",
-          "arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:document/AWS-RunShellScript"
+          "arn:aws:ssm:*::document/AWS-RunShellScript"
         ]
       },
       {
@@ -127,7 +127,7 @@ resource "aws_iam_role" "github_deploy_prod" {
           "${local.oidc_host}:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "${local.oidc_host}:sub" = "repo:${local.repo}:ref:refs/heads/main"
+          "${local.oidc_host}:sub" = "repo:${local.repo}:environment:production"
         }
       }
     }]
