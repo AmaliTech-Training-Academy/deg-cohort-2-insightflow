@@ -265,7 +265,6 @@ jobs:
           INSTANCE:   ${{ steps.targets.outputs.ec2 }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
           REPO_URL:   https://github.com/${{ github.repository }}.git
-          GH_TOKEN:   ${{ secrets.GH_DEPLOY_TOKEN }}
         run: |
           TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2)
 
@@ -274,7 +273,6 @@ jobs:
           cmd = ' '.join([
               f'COMMIT_SHA={os.environ[\"COMMIT_SHA\"]}',
               f'GITHUB_REPO_URL={os.environ[\"REPO_URL\"]}',
-              f'GITHUB_TOKEN={os.environ[\"GH_TOKEN\"]}',
               'bash /tmp/deploy.sh',
           ])
           print(json.dumps({'commands': [cmd]}))
