@@ -1,3 +1,4 @@
+## Build artifacts
 target/
 *.class
 *.jar
@@ -50,4 +51,5 @@ docker-compose.override.yml
 **/terraform.tfstate.backup
 **/tfplan
 
+/tunnel-dev.sh
 report.html

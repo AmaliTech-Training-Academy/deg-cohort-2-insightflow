@@ -79,13 +79,14 @@ module "vpc" {
 # ── Security groups ───────────────────────────────────────────────────────────
 # Dev: ALB routes HTTP traffic; SSH open for debugging.
 module "security_groups" {
-  source          = "../../modules/security-groups"
-  name            = local.name
-  vpc_id          = module.vpc.vpc_id
-  enable_alb      = true
-  enable_ssh      = true          # dev only — never enable in prod
-  ssh_cidr_blocks = ["0.0.0.0/0"] # restrict to your IP for extra safety
-  tags            = local.common_tags
+  source                 = "../../modules/security-groups"
+  name                   = local.name
+  vpc_id                 = module.vpc.vpc_id
+  enable_alb             = true
+  enable_ssh             = true          # dev only — never enable in prod
+  ssh_cidr_blocks        = ["0.0.0.0/0"] # restrict to your IP for extra safety
+  allow_public_db_access = true          # dev only — direct DB access without tunnel
+  tags                   = local.common_tags
 }
 
 # ── EC2 ───────────────────────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ module "redis" {
 module "rds" {
   source                = "../../modules/rds"
   name                  = local.name
-  private_subnet_ids    = module.vpc.private_subnet_ids
+  private_subnet_ids    = concat(module.vpc.public_subnet_ids, module.vpc.private_subnet_ids) # include public subnets so RDS can get a public IP
   rds_security_group_id = module.security_groups.rds_sg_id
   instance_class        = "db.t3.micro"
   allocated_storage_gb  = 20
@@ -133,6 +134,7 @@ module "rds" {
   skip_final_snapshot   = true
   deletion_protection   = false
   backup_retention_days = 1
+  publicly_accessible   = true # dev only — direct connection without tunnel
 
   tags = local.common_tags
 }

@@ -59,7 +59,7 @@ resource "aws_db_instance" "app" {
   parameter_group_name   = aws_db_parameter_group.postgres16.name
 
   multi_az                = var.multi_az
-  publicly_accessible     = false
+  publicly_accessible     = var.publicly_accessible
   skip_final_snapshot     = var.skip_final_snapshot
   deletion_protection     = var.deletion_protection
   backup_retention_period = var.backup_retention_days
@@ -95,7 +95,7 @@ resource "aws_db_instance" "warehouse" {
   parameter_group_name   = aws_db_parameter_group.postgres16.name
 
   multi_az                = var.multi_az
-  publicly_accessible     = false
+  publicly_accessible     = var.publicly_accessible
   skip_final_snapshot     = var.skip_final_snapshot
   deletion_protection     = var.deletion_protection
   backup_retention_period = var.backup_retention_days

@@ -1,0 +1,175 @@
+name: Deploy → Dev
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SOURCE OF TRUTH: devops/.github/workflows/deploy-dev.yml
+# Mirror:          .github/workflows/deploy-dev.yml  (read by GitHub Actions)
+# Keep both files identical. Edit here, then copy to .github/workflows/.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Triggers only after CI passes on dev.
+# This guarantees every deploy has survived lint, tests, and security scans.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [dev]
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false   # never abort an in-flight deploy
+
+permissions:
+  id-token: write   # OIDC → AWS assume-role
+  contents: read
+
+env:
+  AWS_REGION:    eu-west-1
+  ENV_CONFIG:    devops/scripts/envs/dev.env
+  DEPLOY_SCRIPT: devops/scripts/zero-downtime-deploy.sh
+  SSM_WAIT:      devops/scripts/ssm-wait.sh
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── Guard ────────────────────────────────────────────────────────────────────
+  ci-gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - run: echo "CI passed on ${{ github.event.workflow_run.head_sha }} — starting dev deploy"
+
+  # ── Deploy ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2 (dev)
+    runs-on: ubuntu-latest
+    needs: ci-gate
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_DEV }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Make SSM helper executable
+        run: chmod +x "${{ env.SSM_WAIT }}"
+
+      # Helper: base64-encode a local file and build the SSM parameters JSON.
+      # Usage:  ssm_upload <local-file> <remote-path>
+      # Output: writes /tmp/ssm-params.json then sends the command and waits.
+      - name: Upload docker-compose, env config, and deploy script
+        env:
+          INSTANCE: ${{ secrets.DEV_EC2_INSTANCE_ID }}
+        run: |
+          ssm_upload() {
+            local src="$1" dst="$2" timeout="${3:-60}"
+            python3 -c "
+          import json, base64, sys
+          b64 = base64.b64encode(open(sys.argv[1], 'rb').read()).decode()
+          print(json.dumps({'commands': [
+              'mkdir -p $(dirname ' + sys.argv[2] + ')',
+              f\"printf '%s' '{b64}' | base64 -d > {sys.argv[2]}\",
+          ]}))
+          " "$src" "$dst" > /tmp/ssm-params.json
+
+            CMD_ID=$(aws ssm send-command \
+              --instance-ids "$INSTANCE" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "file:///tmp/ssm-params.json" \
+              --output text --query "Command.CommandId")
+
+            "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" "$timeout"
+          }
+
+          ssm_upload docker-compose.yml          /opt/insightflow/docker-compose.yml 60
+          ssm_upload "${{ env.ENV_CONFIG }}"     /tmp/deploy.env                     30
+          ssm_upload "${{ env.DEPLOY_SCRIPT }}"  /tmp/deploy.sh                      30
+
+          # Make deploy script executable on the instance
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE" \
+            --document-name "AWS-RunShellScript" \
+            --parameters '{"commands":["chmod +x /tmp/deploy.sh"]}' \
+            --output text --query "Command.CommandId")
+          "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" 15
+
+      # Build on EC2 + canary pre-flight + zero-downtime swap + auto-rollback
+      - name: Run zero-downtime deploy via SSM
+        id: ssm_deploy
+        env:
+          INSTANCE:   ${{ secrets.DEV_EC2_INSTANCE_ID }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO_URL:   https://github.com/${{ github.repository }}.git
+        run: |
+          TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2)
+
+          python3 -c "
+          import json, os
+          cmd = ' '.join([
+              f'COMMIT_SHA={os.environ[\"COMMIT_SHA\"]}',
+              f'GITHUB_REPO_URL={os.environ[\"REPO_URL\"]}',
+              'bash /tmp/deploy.sh',
+          ])
+          print(json.dumps({'commands': [cmd]}))
+          " > /tmp/ssm-deploy.json
+
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "file:///tmp/ssm-deploy.json" \
+            --output text --query "Command.CommandId")
+
+          echo "SSM Command ID: $CMD_ID"
+          "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" "$TIMEOUT"
+
+      # End-to-end validation through the ALB (proves DNS + TG + container)
+      - name: Smoke test via ALB
+        run: |
+          ALB="${{ secrets.DEV_ALB_DNS_NAME }}"
+          for i in $(seq 1 12); do
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
+              --max-time 10 "http://$ALB/api-docs/" 2>/dev/null || echo "000")
+            echo "[$i/12] ALB → HTTP $HTTP"
+            if [[ "$HTTP" == "200" ]]; then echo "Smoke test passed"; exit 0; fi
+            sleep 10
+          done
+          echo "Smoke test failed — check CloudWatch Logs"
+          exit 1
+
+      - name: Record deployment metric
+        if: always()
+        run: |
+          DIMS="Dimensions=[{Name=Environment,Value=dev},{Name=Status,Value=${{ job.status }}}]"
+          aws cloudwatch put-metric-data \
+            --namespace "InsightFlow/Deployments" \
+            --metric-data "MetricName=DeploymentCount,Value=1,Unit=Count,${DIMS}" \
+            --region "${{ env.AWS_REGION }}" || true
+
+  # ── Summary ──────────────────────────────────────────────────────────────────
+  summary:
+    name: Deployment summary
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Write job summary
+        run: |
+          STATUS="${{ needs.deploy.result }}"
+          [[ "$STATUS" == "success" ]] && ICON="✅" || ICON="❌"
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## ${ICON} Dev Deployment — ${STATUS}
+
+          | Field       | Value |
+          |-------------|-------|
+          | **Commit**  | \`${{ github.event.workflow_run.head_sha }}\` |
+          | **Branch**  | \`dev\` |
+          | **Build**   | on EC2 — no container registry |
+          | **CI run**  | [#${{ github.event.workflow_run.id }}](${{ github.event.workflow_run.html_url }}) |
+          | **ALB**     | http://${{ secrets.DEV_ALB_DNS_NAME }} |
+          EOF

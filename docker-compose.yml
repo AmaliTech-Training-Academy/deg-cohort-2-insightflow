@@ -45,7 +45,22 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    image: insightflow-frontend:${DEPLOY_TAG:-local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+    container_name: insightflow-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   backend:
+    image: insightflow-backend:${DEPLOY_TAG:-local}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -76,6 +91,7 @@ services:
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
   celery-worker:
+    image: insightflow-backend:${DEPLOY_TAG:-local}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -103,6 +119,7 @@ services:
     command: celery -A insightflow worker --loglevel=info --concurrency=2
 
   etl:
+    image: insightflow-etl:${DEPLOY_TAG:-local}
     build:
       context: ./data-engineering
       dockerfile: Dockerfile
