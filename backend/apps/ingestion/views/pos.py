@@ -1,7 +1,7 @@
 import logging
 
 from rest_framework import status
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -83,16 +83,3 @@ class POSStagingListCreateView(ListCreateAPIView):
         )
 
 
-class POSStagingDetailView(RetrieveUpdateDestroyAPIView):
-    """
-    GET    /api/ingestion/pos/<pk>/
-    PUT    /api/ingestion/pos/<pk>/
-    PATCH  /api/ingestion/pos/<pk>/
-    DELETE /api/ingestion/pos/<pk>/
-    """
-
-    serializer_class = PosTransactionLineSerializer
-    permission_classes = [IsAuthenticated]
-    queryset = PosTransactionLine.objects.select_related(
-        "posTransactionId", "productSKU"
-    ).all()

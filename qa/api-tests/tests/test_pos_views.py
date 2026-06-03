@@ -1,21 +1,16 @@
 """
 Unit tests for POS views.
 
-Tests POSStagingListCreateView (GET list + POST CSV upload) and
-POSStagingDetailView (GET / PATCH / DELETE) using APIRequestFactory so
-no live server or URL routing is required.
+Tests POSStagingListCreateView (GET list + POST CSV upload)
+using APIRequestFactory so no live server or URL routing is required.
 """
 
 import io
-from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
-from apps.ingestion.models.inventory import Category, Product, Store
-from apps.ingestion.models.pos import Cashier, PosTransaction, PosTransactionLine
-from apps.ingestion.views.pos import POSStagingDetailView, POSStagingListCreateView
+from apps.ingestion.views.pos import POSStagingListCreateView
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 User = get_user_model()
@@ -226,104 +221,3 @@ class TestPOSStagingCSVUpload:
         mt.delay.assert_not_called()
 
 
-# ── detail view ───────────────────────────────────────────────────────────────
-
-
-@pytest.mark.django_db
-class TestPOSStagingDetailView:
-    """Tests for GET / PATCH / DELETE /api/ingestion/pos/<pk>/."""
-
-    def setup_method(self):
-        self.factory = APIRequestFactory()
-        self.user = User.objects.create_user(
-            username="tester", email="tester@test.com", password="pass"
-        )
-        self.view = POSStagingDetailView.as_view()
-
-        # Build a full PosTransactionLine fixture
-        store = Store.objects.create(
-            storeId=1, storeName="Test Store", province="Ontario"
-        )
-        cashier = Cashier.objects.create(
-            cashierId=1, storeId=store, fullName="Test Cashier", userId=self.user
-        )
-        transaction = PosTransaction.objects.create(
-            posTransactionId=1,
-            storeId=store,
-            cashierId=cashier,
-            transactionDatetime=timezone.now(),
-        )
-        category = Category.objects.create(categoryId=1, name="Electronics")
-        product = Product.objects.create(
-            productSKU="PROD-0000001", productName="Laptop", categoryId=category
-        )
-        self.line = PosTransactionLine.objects.create(
-            lineId=1,
-            posTransactionId=transaction,
-            productSKU=product,
-            quantity=2,
-            unitPrice=Decimal("99.99"),
-            discountApplied=Decimal("0.00"),
-            totalAmount=Decimal("199.98"),
-        )
-
-    def test_get_existing_record_returns_200(self):
-        """GET /pos/<pk>/ with a valid pk returns 200."""
-        request = self.factory.get(f"/api/ingestion/pos/{self.line.lineId}/")
-        force_authenticate(request, user=self.user)
-        response = self.view(request, pk=self.line.lineId)
-        assert response.status_code == 200
-
-    def test_get_returns_correct_lineId(self):
-        """GET response contains the correct lineId."""
-        request = self.factory.get(f"/api/ingestion/pos/{self.line.lineId}/")
-        force_authenticate(request, user=self.user)
-        response = self.view(request, pk=self.line.lineId)
-        assert response.data["lineId"] == self.line.lineId
-
-    def test_get_returns_correct_quantity(self):
-        """GET response contains the correct quantity value."""
-        request = self.factory.get(f"/api/ingestion/pos/{self.line.lineId}/")
-        force_authenticate(request, user=self.user)
-        response = self.view(request, pk=self.line.lineId)
-        assert response.data["quantity"] == 2
-
-    def test_get_nonexistent_returns_404(self):
-        """GET /pos/999999/ returns 404."""
-        request = self.factory.get("/api/ingestion/pos/999999/")
-        force_authenticate(request, user=self.user)
-        response = self.view(request, pk=999999)
-        assert response.status_code == 404
-
-    def test_get_unauthenticated_returns_401(self):
-        """GET without auth returns 401."""
-        request = self.factory.get(f"/api/ingestion/pos/{self.line.lineId}/")
-        response = self.view(request, pk=self.line.lineId)
-        assert response.status_code == 401
-
-    def test_delete_returns_204(self):
-        """DELETE /pos/<pk>/ returns 204 No Content."""
-        request = self.factory.delete(f"/api/ingestion/pos/{self.line.lineId}/")
-        force_authenticate(request, user=self.user)
-        response = self.view(request, pk=self.line.lineId)
-        assert response.status_code == 204
-
-    def test_delete_removes_record_from_db(self):
-        """DELETE actually removes the record from the database."""
-        request = self.factory.delete(f"/api/ingestion/pos/{self.line.lineId}/")
-        force_authenticate(request, user=self.user)
-        self.view(request, pk=self.line.lineId)
-        assert not PosTransactionLine.objects.filter(lineId=self.line.lineId).exists()
-
-    def test_patch_updates_quantity(self):
-        """PATCH /pos/<pk>/ updates a single field."""
-        request = self.factory.patch(
-            f"/api/ingestion/pos/{self.line.lineId}/",
-            {"quantity": 10},
-            format="json",
-        )
-        force_authenticate(request, user=self.user)
-        response = self.view(request, pk=self.line.lineId)
-        assert response.status_code == 200
-        self.line.refresh_from_db()
-        assert self.line.quantity == 10
