@@ -61,7 +61,8 @@ PG_CONFIG = {
     "password": _required_env("PG_PASSWORD", "WAREHOUSE_DB_PASSWORD"),
 }
 
-# Metabase data-source registration (falls back to WAREHOUSE_DB_* if METABASE_DB_* not set)
+# Metabase data-source registration
+# Falls back to WAREHOUSE_DB_* variables if METABASE_DB_* are not set.
 METABASE_DB_CONFIG = {
     "engine": "postgres",
     "name": _env("METABASE_DB_NAME", default="InsightFlow Warehouse"),

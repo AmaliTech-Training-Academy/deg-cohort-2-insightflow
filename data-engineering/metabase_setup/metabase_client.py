@@ -182,7 +182,12 @@ def build_tabbed_dashboard(session_id, db_id, tabs, name="InsightFlow Analytics"
 
     # 3. Attach tabs + dashcards + filters in a single PUT
     # Normalise parameters: add slug and sectionId required by Metabase API
-    _section_map = {"date/range": "date", "date/single": "date", "string/=": "string", "number/=": "number"}
+    _section_map = {
+        "date/range": "date",
+        "date/single": "date",
+        "string/=": "string",
+        "number/=": "number",
+    }
     mb_params = []
     for p in (parameters or []):
         mb_params.append({
@@ -195,14 +200,21 @@ def build_tabbed_dashboard(session_id, db_id, tabs, name="InsightFlow Analytics"
 
     r = _session.put(
         f"{METABASE_URL}/api/dashboard/{dashboard_id}",
-        json={"tabs": mb_tabs, "dashcards": all_dashcards, "parameters": mb_params},
+        json={
+            "tabs": mb_tabs,
+            "dashcards": all_dashcards,
+            "parameters": mb_params,
+        },
         headers=headers,
         timeout=30,
     )
     if r.status_code not in (200, 202):
         logger.warning(f"Failed to attach cards/tabs to dashboard: {r.text[:300]}")
 
-    logger.info(f"Dashboard '{name}' created with {len(tabs)} tabs and {card_index} cards. ID: {dashboard_id}")
+    logger.info(
+        f"Dashboard '{name}' created with {len(tabs)} tabs"
+        f" and {card_index} cards. ID: {dashboard_id}"
+    )
     return dashboard_id
 
 # ----------------------------
@@ -222,7 +234,10 @@ def set_homepage(session_id, dashboard_id):
         if r.status_code in (200, 202):
             logger.info(f"Homepage set → {METABASE_URL}/dashboard/{dashboard_id}")
             return
-    logger.info(f"Homepage auto-set not supported by this Metabase version. Access dashboard at: {METABASE_URL}/dashboard/{dashboard_id}")
+    logger.info(
+        "Homepage auto-set not supported by this Metabase version."
+        f" Access dashboard at: {METABASE_URL}/dashboard/{dashboard_id}"
+    )
 
 
 # ----------------------------
@@ -237,12 +252,27 @@ def create_filter_value_cards(session_id, db_id):
     value_card_ids = {}
 
     FILTER_CARDS = [
-        {"key": "country_values", "name": "Country Filter",
-         "sql": "SELECT DISTINCT country FROM v_country_comparison ORDER BY country;"},
-        {"key": "region_values", "name": "Region Filter",
-         "sql": "SELECT DISTINCT region_name FROM v_regional_comparison ORDER BY region_name;"},
-        {"key": "category_values", "name": "Category Filter",
-         "sql": "SELECT DISTINCT \"categoryName\" FROM v_product_revenue ORDER BY \"categoryName\";"}
+        {
+            "key": "country_values",
+            "name": "Country Filter",
+            "sql": "SELECT DISTINCT country FROM v_country_comparison ORDER BY country;",
+        },
+        {
+            "key": "region_values",
+            "name": "Region Filter",
+            "sql": (
+                "SELECT DISTINCT region_name FROM v_regional_comparison"
+                " ORDER BY region_name;"
+            ),
+        },
+        {
+            "key": "category_values",
+            "name": "Category Filter",
+            "sql": (
+                'SELECT DISTINCT "categoryName" FROM v_product_revenue'
+                ' ORDER BY "categoryName";'
+            ),
+        },
     ]
 
     for fvc in FILTER_CARDS:
@@ -255,6 +285,9 @@ def create_filter_value_cards(session_id, db_id):
         r = _session.post(f"{METABASE_URL}/api/card", json=payload, headers=headers, timeout=10)
         if r.status_code in (200, 202):
             value_card_ids[fvc["key"]] = int(r.json()["id"])
-            logger.info(f"Filter card created: {fvc['name']} (ID: {value_card_ids[fvc['key']]})")
+            logger.info(
+                f"Filter card created: {fvc['name']}"
+                f" (ID: {value_card_ids[fvc['key']]})"
+            )
 
     return value_card_ids

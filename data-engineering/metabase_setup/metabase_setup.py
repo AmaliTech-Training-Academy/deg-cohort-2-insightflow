@@ -79,7 +79,7 @@ def main():
     clean_up(session_id)
 
     # Create filter value cards
-    value_card_ids = create_filter_value_cards(session_id, database_id)
+    create_filter_value_cards(session_id, database_id)
 
     # Dashboard parameters (filters)
     all_params = [

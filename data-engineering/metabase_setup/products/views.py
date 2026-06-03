@@ -26,7 +26,9 @@ SELECT
     p."categoryName",
     SUM(f."quantity") AS total_units_sold,
     COUNT(DISTINCT f."dateKey") AS active_sales_days,
-    ROUND(SUM(f."quantity")::numeric / NULLIF(COUNT(DISTINCT f."dateKey"), 0), 2) AS avg_units_per_day,
+    ROUND(
+        SUM(f."quantity")::numeric / NULLIF(COUNT(DISTINCT f."dateKey"), 0), 2
+    ) AS avg_units_per_day,
     SUM(f."netAmount") AS total_revenue
 FROM "factSales" f
 JOIN "dimProduct" p ON f."productKey" = p."productKey"
