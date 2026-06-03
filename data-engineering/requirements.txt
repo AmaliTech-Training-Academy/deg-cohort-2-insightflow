@@ -5,4 +5,4 @@ python-dotenv==1.2.2
 matplotlib==3.8.2
 celery[redis]==5.3.6
 redis==5.0.1
-requests==2.32.3
+requests==2.33.0
