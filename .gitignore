@@ -25,6 +25,10 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
+## Data-engineering virtual environment and generated outputs
+data-engineering/data_eng/
+data-engineering/lineage/
+
 ## Env & secrets
 .env
 .env.example
