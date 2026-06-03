@@ -107,9 +107,7 @@ fi
 cd "$REPO_DIR"
 log "Fetching origin..."
 git "${GIT_OPTS[@]}" fetch --quiet origin
-git reset --hard HEAD
-git clean -fd
-git checkout --quiet --detach "$COMMIT_SHA"
+git checkout -f --quiet --detach "$COMMIT_SHA"
 log "Checked out ${COMMIT_SHA}"
 
 # ── 3. Build new images ───────────────────────────────────────────────────────
