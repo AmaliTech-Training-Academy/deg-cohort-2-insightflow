@@ -9,6 +9,12 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pandas as pd
 import pytest
+from apps.core.exceptions import (
+    CSVParseException,
+    FileSizeLimitException,
+    UnsupportedFileTypeException,
+    ValidationException,
+)
 from apps.ingestion.models.base import InjectionJob
 from apps.ingestion.services.csv_services import POSIngestionService
 
@@ -21,18 +27,18 @@ class TestPOSIngestionServiceValidateUpload:
         return POSIngestionService()
 
     def test_file_size_exceeds_limit(self, service):
-        """Files over 50MB rejected."""
+        """Files over 50MB rejected with FileSizeLimitException."""
         file = Mock()
         file.size = 51 * 1024 * 1024
         file.name = "test.csv"
 
-        result = service.validate_upload(file)
+        with pytest.raises(FileSizeLimitException) as exc_info:
+            service.validate_upload(file)
 
-        assert result["ok"] is False
-        assert "maximum is 50MB" in result["error"]
+        assert "maximum is 50MB" in str(exc_info.value.detail)
 
     def test_file_size_at_limit_accepted(self, service):
-        """Files at 50MB limit accepted (if valid otherwise)."""
+        """Files at exactly 50MB accepted — validate_upload returns None."""
         file_content = (
             b"transaction_id,date,store_id,cashier_id,"
             b"product_sku,quantity,unit_price,discount_applied,total\n"
@@ -41,7 +47,6 @@ class TestPOSIngestionServiceValidateUpload:
         file.name = "test.csv"
         file.size = 50 * 1024 * 1024
 
-        # Mock pandas
         with patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_read:
             mock_read.return_value = Mock(
                 columns=Mock(
@@ -61,21 +66,21 @@ class TestPOSIngestionServiceValidateUpload:
 
             result = service.validate_upload(file)
 
-            assert result["ok"] is True
+            assert result is None
 
     def test_non_csv_file_rejected(self, service):
-        """Non-.csv files rejected."""
+        """Non-.csv files rejected with UnsupportedFileTypeException."""
         file = Mock()
         file.size = 1024
         file.name = "test.txt"
 
-        result = service.validate_upload(file)
+        with pytest.raises(UnsupportedFileTypeException) as exc_info:
+            service.validate_upload(file)
 
-        assert result["ok"] is False
-        assert "Only .csv files" in result["error"]
+        assert "Only .csv files" in str(exc_info.value.detail)
 
     def test_csv_extension_case_insensitive(self, service):
-        """File extension check is case-insensitive."""
+        """File extension check is case-insensitive — validate_upload returns None."""
         file_content = (
             b"transaction_id,date,store_id,cashier_id,"
             b"product_sku,quantity,unit_price,discount_applied,total\n"
@@ -103,10 +108,10 @@ class TestPOSIngestionServiceValidateUpload:
 
             result = service.validate_upload(file)
 
-            assert result["ok"] is True
+            assert result is None
 
     def test_csv_parse_error(self, service):
-        """Unparseable CSV rejected."""
+        """Unparseable CSV rejected with CSVParseException."""
         file = Mock()
         file.size = 1024
         file.name = "test.csv"
@@ -114,13 +119,13 @@ class TestPOSIngestionServiceValidateUpload:
         with patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_read:
             mock_read.side_effect = pd.errors.ParserError("bad CSV")
 
-            result = service.validate_upload(file)
+            with pytest.raises(CSVParseException) as exc_info:
+                service.validate_upload(file)
 
-            assert result["ok"] is False
-            assert "Could not read CSV" in result["error"]
+            assert "Could not read CSV" in str(exc_info.value.detail)
 
     def test_missing_required_columns(self, service):
-        """Missing required columns reported."""
+        """Missing required columns reported via ValidationException."""
         file = Mock()
         file.size = 1024
         file.name = "test.csv"
@@ -138,11 +143,12 @@ class TestPOSIngestionServiceValidateUpload:
                 )
             )
 
-            result = service.validate_upload(file)
+            with pytest.raises(ValidationException) as exc_info:
+                service.validate_upload(file)
 
-            assert result["ok"] is False
-            assert "missing_columns" in result
-            assert len(result["missing_columns"]) > 0
+            exc = exc_info.value
+            assert "missing_columns" in exc.details
+            assert len(exc.details["missing_columns"]) > 0
 
     def test_file_seek_reset_after_validation(self, service):
         """File pointer reset after validation."""
