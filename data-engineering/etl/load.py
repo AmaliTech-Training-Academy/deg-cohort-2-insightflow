@@ -113,8 +113,9 @@ def _bulk_insert(
         When True, return rows produced by a ``RETURNING`` clause.
     """
     cursor = conn.connection.cursor()
-    execute_values(cursor, sql, rows, template=template, page_size=_BATCH_SIZE,
-                   fetch=fetch)
+    execute_values(
+        cursor, sql, rows, template=template, page_size=_BATCH_SIZE, fetch=fetch
+    )
     if fetch:
         return list(cursor.fetchall())
     return []
