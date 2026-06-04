@@ -15,13 +15,13 @@ variable "private_subnet_ids" {
   type = list(string)
 }
 
-variable "alb_sg_id" {
-  description = "ALB security group — allowed to reach ECS tasks"
+variable "tasks_sg_id" {
+  description = "Security group ID for ECS Fargate tasks — created by the security-groups module with enable_ecs = true"
   type        = string
 }
 
 variable "alb_listener_arn" {
-  description = "ALB listener ARN to attach target groups to"
+  description = "ALB HTTP listener ARN to attach target group rules to"
   type        = string
 }
 

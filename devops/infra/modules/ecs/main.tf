@@ -53,30 +53,10 @@ resource "aws_cloudwatch_log_group" "etl" {
   tags              = var.tags
 }
 
-# ── Security group for ECS tasks ──────────────────────────────────────────────
-resource "aws_security_group" "tasks" {
-  name        = "${var.name}-ecs-tasks"
-  description = "ECS Fargate tasks — allow ALB inbound, all outbound"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "From ALB"
-    from_port       = 0
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [var.alb_sg_id]
-  }
-
-  egress {
-    description = "Allow all outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, { Name = "${var.name}-ecs-tasks" })
-}
+# ── Security group ────────────────────────────────────────────────────────────
+# The ECS tasks SG is created by the security-groups module (enable_ecs = true)
+# and passed in via var.tasks_sg_id. This keeps all SG rules in one place and
+# avoids circular dependencies between modules.
 
 # ── IAM — Task Execution Role (ECS control plane) ────────────────────────────
 resource "aws_iam_role" "execution" {
@@ -496,7 +476,7 @@ resource "aws_ecs_service" "backend" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.tasks.id]
+    security_groups  = [var.tasks_sg_id]
     assign_public_ip = false
   }
 
@@ -526,7 +506,7 @@ resource "aws_ecs_service" "frontend" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.tasks.id]
+    security_groups  = [var.tasks_sg_id]
     assign_public_ip = false
   }
 
@@ -555,7 +535,7 @@ resource "aws_ecs_service" "celery" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.tasks.id]
+    security_groups  = [var.tasks_sg_id]
     assign_public_ip = false
   }
 
@@ -578,7 +558,7 @@ resource "aws_ecs_service" "etl_listener" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.tasks.id]
+    security_groups  = [var.tasks_sg_id]
     assign_public_ip = false
   }
 
@@ -601,7 +581,7 @@ resource "aws_ecs_service" "etl_worker" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.tasks.id]
+    security_groups  = [var.tasks_sg_id]
     assign_public_ip = false
   }
 

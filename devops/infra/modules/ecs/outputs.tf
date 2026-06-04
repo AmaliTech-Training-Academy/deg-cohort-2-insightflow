@@ -32,5 +32,6 @@ output "migration_task_definition_arn" {
 }
 
 output "task_security_group_id" {
-  value = aws_security_group.tasks.id
+  description = "ECS tasks security group ID (passed in from the security-groups module)"
+  value       = var.tasks_sg_id
 }
