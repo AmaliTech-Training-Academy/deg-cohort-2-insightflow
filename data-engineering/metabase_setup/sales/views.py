@@ -26,6 +26,36 @@ JOIN "dimDate" d ON f."dateKey" = d."dateKey"
 GROUP BY d."fullDate"
 ORDER BY d."fullDate";
 
+-- Daily revenue by channel — last 30 days (completed sales only)
+--
+-- Metric definition:
+--   daily_revenue = SUM(quantity × unit_price − discount_applied)
+--                 = SUM(netAmount)  [netAmount is pre-computed identically]
+--   Only rows with status = 'Completed' are included.
+--   Channel split: in-store vs online (dimChannel.channelType).
+--   Default window: last 30 days (extend via additional WHERE on date).
+CREATE OR REPLACE VIEW v_daily_revenue_by_channel AS
+SELECT
+    d."fullDate"                                          AS date,
+    ch."channelName"                                      AS channel,
+    ch."channelType"                                      AS channel_type,
+    COUNT(f."salesKey")                                   AS transactions,
+    SUM(
+        f."quantity" * f."unitPrice" - f."discountApplied"
+    )                                                     AS daily_revenue,
+    SUM(f."discountApplied")                              AS total_discount
+FROM "factSales" f
+JOIN "dimDate" d
+    ON f."dateKey" = d."dateKey"
+JOIN "dimChannel" ch
+    ON f."channelKey" = ch."channelKey"
+LEFT JOIN "dimOrderStatus" os
+    ON f."orderStatusKey" = os."orderStatusKey"
+WHERE (os."statusName" ILIKE 'completed' OR f."orderStatusKey" IS NULL)
+  AND d."fullDate" >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY d."fullDate", ch."channelName", ch."channelType"
+ORDER BY d."fullDate", ch."channelName";
+
 -- Monthly revenue
 CREATE OR REPLACE VIEW v_monthly_revenue AS
 SELECT

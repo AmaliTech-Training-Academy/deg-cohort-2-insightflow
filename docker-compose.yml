@@ -157,9 +157,7 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
-    command: >
-      sh -c "python create_star_schema.py &&
-             python etl_pipeline.py"
+    command: python etl_pipeline.py
 
   etl-listener:
     image: insightflow-etl:${DEPLOY_TAG:-local}
@@ -210,7 +208,45 @@ services:
              --queues=etl
              --concurrency=1
 
+  # ── Metabase ──────────────────────────────────────────────────────────────────
+  # Analytics/BI layer — warehouse DB is external (RDS), configured via .env.
+  # metabase-setup runs once to register the data source, then exits.
+  metabase:
+    image: metabase/metabase:latest
+    container_name: insightflow-metabase
+    ports:
+      - "3001:3000"
+    environment:
+      MB_DB_TYPE: h2
+    volumes:
+      - metabase-data:/metabase-data
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  metabase-setup:
+    image: insightflow-etl:${DEPLOY_TAG:-local}
+    build:
+      context: ./data-engineering
+      dockerfile: Dockerfile
+    container_name: insightflow-metabase-setup
+    env_file: .env
+    depends_on:
+      metabase:
+        condition: service_healthy
+    restart: "no"
+    command: >
+      sh -c "cd metabase_setup && python metabase_setup.py"
+
 volumes:
+  pgdata-app:
+  pgdata-warehouse:
   redis-data:
   media-data:
   postgres-app-data:
