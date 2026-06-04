@@ -24,7 +24,7 @@ export default defineConfig({
   },
   server: {
     fs: {
-      // Allow serving files from 
+      // Allow serving files from outside the frontend root
       allow: [path.resolve(__dirname, "..")],
     },
   },
