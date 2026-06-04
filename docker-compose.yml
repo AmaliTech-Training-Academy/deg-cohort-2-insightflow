@@ -192,3 +192,4 @@ volumes:
   pgdata-warehouse:
   redis-data:
   media-data:
+  metabase-data:
