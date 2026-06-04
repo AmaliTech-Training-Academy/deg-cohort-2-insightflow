@@ -16,8 +16,9 @@ variable "alb_security_group_id" {
 }
 
 variable "ec2_instance_id" {
-  description = "EC2 instance to register in both target groups"
+  description = "EC2 instance to register in target groups. Leave empty when using ECS (target groups are managed by the ECS module)."
   type        = string
+  default     = ""
 }
 
 variable "enable_https" {

@@ -14,7 +14,6 @@ resource "aws_lb" "this" {
   drop_invalid_header_fields = true
   enable_deletion_protection = var.enable_deletion_protection
 
-  # Access logs are optional — enable by setting var.access_logs_bucket
   dynamic "access_logs" {
     for_each = var.access_logs_bucket != "" ? [1] : []
     content {
@@ -27,9 +26,14 @@ resource "aws_lb" "this" {
   tags = merge(var.tags, { Name = "${var.name}-alb" })
 }
 
-# ── Target groups ────────────────────────────────────────────────────────────
+# ── Target groups (EC2 mode only) ─────────────────────────────────────────────
+# When ec2_instance_id is empty the ALB is used with ECS.
+# In ECS mode the ECS module creates IP-based target groups and listener rules;
+# these instance-based groups are not created at all.
 
 resource "aws_lb_target_group" "frontend" {
+  count = var.ec2_instance_id != "" ? 1 : 0
+
   name        = "${var.name}-tg-frontend"
   port        = 3000
   protocol    = "HTTP"
@@ -48,6 +52,8 @@ resource "aws_lb_target_group" "frontend" {
 }
 
 resource "aws_lb_target_group" "api" {
+  count = var.ec2_instance_id != "" ? 1 : 0
+
   name        = "${var.name}-tg-api"
   port        = 8080
   protocol    = "HTTP"
@@ -66,22 +72,25 @@ resource "aws_lb_target_group" "api" {
 }
 
 resource "aws_lb_target_group_attachment" "frontend" {
-  target_group_arn = aws_lb_target_group.frontend.arn
+  count = var.ec2_instance_id != "" ? 1 : 0
+
+  target_group_arn = aws_lb_target_group.frontend[0].arn
   target_id        = var.ec2_instance_id
   port             = 3000
 }
 
 resource "aws_lb_target_group_attachment" "api" {
-  target_group_arn = aws_lb_target_group.api.arn
+  count = var.ec2_instance_id != "" ? 1 : 0
+
+  target_group_arn = aws_lb_target_group.api[0].arn
   target_id        = var.ec2_instance_id
   port             = 8080
 }
 
-# ── Listeners ────────────────────────────────────────────────────────────────
+# ── Listeners ─────────────────────────────────────────────────────────────────
 
 locals {
-  # In HTTPS mode: HTTP redirects to 443 and HTTPS is the main listener.
-  # In HTTP-only mode (dev): HTTP forwards directly to target groups.
+  # Which ARN the API listener rule attaches to (HTTPS when enabled, else HTTP)
   main_listener_arn = var.enable_https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
 }
 
@@ -90,6 +99,7 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  # Case 1 — HTTPS mode: redirect port 80 to 443
   dynamic "default_action" {
     for_each = var.enable_https ? [1] : []
     content {
@@ -102,16 +112,29 @@ resource "aws_lb_listener" "http" {
     }
   }
 
+  # Case 2 — EC2 mode: forward to EC2-backed frontend target group
   dynamic "default_action" {
-    for_each = var.enable_https ? [] : [1]
+    for_each = !var.enable_https && var.ec2_instance_id != "" ? [1] : []
     content {
       type             = "forward"
-      target_group_arn = aws_lb_target_group.frontend.arn
+      target_group_arn = aws_lb_target_group.frontend[0].arn
+    }
+  }
+
+  # Case 3 — ECS mode: fixed 503; ECS listener rules (/* at priority 20) take over
+  dynamic "default_action" {
+    for_each = !var.enable_https && var.ec2_instance_id == "" ? [1] : []
+    content {
+      type = "fixed-response"
+      fixed_response {
+        content_type = "text/plain"
+        message_body = "Service unavailable"
+        status_code  = "503"
+      }
     }
   }
 }
 
-# HTTPS listener — prod only; dev uses HTTP-only (no ACM cert required)
 resource "aws_lb_listener" "https" {
   count = var.enable_https ? 1 : 0
 
@@ -123,18 +146,20 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.frontend[0].arn
   }
 }
 
-# /api/* and /api-docs/* → Django (attaches to whichever listener is "main")
+# /api/* and /api-docs/* → Django (EC2 mode only; ECS module creates its own rules)
 resource "aws_lb_listener_rule" "api" {
+  count = var.ec2_instance_id != "" ? 1 : 0
+
   listener_arn = local.main_listener_arn
   priority     = 10
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = aws_lb_target_group.api[0].arn
   }
 
   condition {
@@ -144,8 +169,7 @@ resource "aws_lb_listener_rule" "api" {
   }
 }
 
-# ── WAF v2 ───────────────────────────────────────────────────────────────────
-# Costs ~$5/month base + $1/10M requests. Only used in prod.
+# ── WAF v2 ────────────────────────────────────────────────────────────────────
 
 resource "aws_wafv2_web_acl" "this" {
   count = var.enable_waf ? 1 : 0
@@ -157,7 +181,6 @@ resource "aws_wafv2_web_acl" "this" {
     allow {}
   }
 
-  # AWS Managed Rules — covers OWASP Top 10, SQLi, XSS, bad bots
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
@@ -177,7 +200,6 @@ resource "aws_wafv2_web_acl" "this" {
     }
   }
 
-  # Blocks Log4Shell (CVE-2021-44228) and other known-bad inputs
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
     priority = 2
@@ -231,7 +253,6 @@ resource "aws_wafv2_web_acl_association" "alb" {
   web_acl_arn  = aws_wafv2_web_acl.this[0].arn
 }
 
-# WAF access logs — name must start with aws-waf-logs-
 resource "aws_cloudwatch_log_group" "waf" {
   count             = var.enable_waf ? 1 : 0
   name              = "aws-waf-logs-${var.name}"
