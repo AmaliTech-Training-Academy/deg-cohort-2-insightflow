@@ -1,4 +1,4 @@
-﻿import { defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -17,12 +17,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
-    pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
     include: [
       "src/**/*.{test,spec}.{ts,tsx}",
       "../qa/frontend-tests/unit/tests/**/*.{test,spec}.{ts,tsx}",
@@ -30,7 +24,7 @@ export default defineConfig({
   },
   server: {
     fs: {
-      // Allow serving files from anywhere inside the monorepo root.
+      // Allow serving files from 
       allow: [path.resolve(__dirname, "..")],
     },
   },
