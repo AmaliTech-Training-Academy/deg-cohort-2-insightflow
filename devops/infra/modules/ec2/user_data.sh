@@ -5,13 +5,22 @@ set -euo pipefail
 dnf install -y docker socat git
 systemctl enable --now docker
 
-# Docker Compose v2 plugin
+# Docker Compose v2 + buildx plugins
+mkdir -p /usr/local/lib/docker/cli-plugins
+
 COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest \
   | grep '"tag_name"' | cut -d'"' -f4)
-mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# buildx — Compose v5 requires 0.17.0+; pin latest to avoid stale OS package
+# shellcheck disable=SC2034  # $${BUILDX_VERSION} is Terraform-escaped ${BUILDX_VERSION}
+BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest \
+  | grep '"tag_name"' | cut -d'"' -f4)
+curl -SL "https://github.com/docker/buildx/releases/download/$${BUILDX_VERSION}/buildx-$${BUILDX_VERSION}.linux-amd64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
 # Allow ec2-user to run Docker without sudo
 usermod -aG docker ec2-user
