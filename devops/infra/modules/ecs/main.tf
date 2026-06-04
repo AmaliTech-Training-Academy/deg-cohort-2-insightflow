@@ -143,9 +143,9 @@ resource "aws_iam_role_policy" "task" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid      = "S3Media"
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+        Sid    = "S3Media"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           "arn:aws:s3:::${var.s3_bucket_name}",
           "arn:aws:s3:::${var.s3_bucket_name}/*"
@@ -321,12 +321,12 @@ resource "aws_ecs_task_definition" "backend" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name         = "backend"
-    image        = var.backend_image
-    essential    = true
-    portMappings = [{ containerPort = 8080, protocol = "tcp" }]
-    environment  = local.backend_env
-    secrets      = concat(local.db_secrets, local.redis_secrets)
+    name             = "backend"
+    image            = var.backend_image
+    essential        = true
+    portMappings     = [{ containerPort = 8080, protocol = "tcp" }]
+    environment      = local.backend_env
+    secrets          = concat(local.db_secrets, local.redis_secrets)
     logConfiguration = local.log_config_backend
     command = ["sh", "-c",
       "python manage.py migrate && python manage.py seed_data && gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
@@ -346,13 +346,13 @@ resource "aws_ecs_task_definition" "migration" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name        = "migration"
-    image       = var.backend_image
-    essential   = true
-    environment = local.backend_env
-    secrets     = local.db_secrets
+    name             = "migration"
+    image            = var.backend_image
+    essential        = true
+    environment      = local.backend_env
+    secrets          = local.db_secrets
     logConfiguration = local.log_config_backend
-    command     = ["python", "manage.py", "migrate", "--noinput"]
+    command          = ["python", "manage.py", "migrate", "--noinput"]
   }])
 
   tags = var.tags
@@ -368,13 +368,13 @@ resource "aws_ecs_task_definition" "celery" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name        = "celery-worker"
-    image       = var.backend_image
-    essential   = true
-    environment = local.backend_env
-    secrets     = concat(local.db_secrets, local.redis_secrets)
+    name             = "celery-worker"
+    image            = var.backend_image
+    essential        = true
+    environment      = local.backend_env
+    secrets          = concat(local.db_secrets, local.redis_secrets)
     logConfiguration = local.log_config_celery
-    command     = ["celery", "-A", "insightflow", "worker", "--loglevel=info", "--concurrency=2"]
+    command          = ["celery", "-A", "insightflow", "worker", "--loglevel=info", "--concurrency=2"]
   }])
 
   tags = var.tags
@@ -390,12 +390,12 @@ resource "aws_ecs_task_definition" "frontend" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name         = "frontend"
-    image        = var.frontend_image
-    essential    = true
-    portMappings = [{ containerPort = 3000, protocol = "tcp" }]
-    environment  = []
-    secrets      = []
+    name             = "frontend"
+    image            = var.frontend_image
+    essential        = true
+    portMappings     = [{ containerPort = 3000, protocol = "tcp" }]
+    environment      = []
+    secrets          = []
     logConfiguration = local.log_config_frontend
   }])
 
@@ -420,9 +420,9 @@ resource "aws_ecs_task_definition" "etl" {
       { name = "WAREHOUSE_DB_PORT", value = "5432" },
       { name = "ETL_BATCH_SIZE", value = "1000" },
     ]
-    secrets = concat(local.db_secrets, local.warehouse_secrets, local.redis_secrets)
+    secrets          = concat(local.db_secrets, local.warehouse_secrets, local.redis_secrets)
     logConfiguration = local.log_config_etl
-    command = ["sh", "-c", "python create_star_schema.py && python etl_pipeline.py"]
+    command          = ["sh", "-c", "python create_star_schema.py && python etl_pipeline.py"]
   }])
 
   tags = var.tags
@@ -445,9 +445,9 @@ resource "aws_ecs_task_definition" "etl_listener" {
       { name = "DB_PORT", value = "5432" },
       { name = "ETL_DEBOUNCE_SECONDS", value = "300" },
     ]
-    secrets = concat(local.db_secrets, local.redis_secrets)
+    secrets          = concat(local.db_secrets, local.redis_secrets)
     logConfiguration = local.log_config_etl
-    command = ["sh", "-c", "python trigger_setup.py install && python -m etl.listener"]
+    command          = ["sh", "-c", "python trigger_setup.py install && python -m etl.listener"]
   }])
 
   tags = var.tags
@@ -469,9 +469,9 @@ resource "aws_ecs_task_definition" "etl_worker" {
     environment = [
       { name = "WAREHOUSE_DB_PORT", value = "5432" },
     ]
-    secrets = concat(local.warehouse_secrets, local.redis_secrets)
+    secrets          = concat(local.warehouse_secrets, local.redis_secrets)
     logConfiguration = local.log_config_etl
-    command = ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--queues=etl", "--concurrency=1"]
+    command          = ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--queues=etl", "--concurrency=1"]
   }])
 
   tags = var.tags
@@ -479,12 +479,12 @@ resource "aws_ecs_task_definition" "etl_worker" {
 
 # ── ECS Services ──────────────────────────────────────────────────────────────
 resource "aws_ecs_service" "backend" {
-  name                               = "${var.name}-backend"
-  cluster                            = aws_ecs_cluster.this.id
-  task_definition                    = aws_ecs_task_definition.backend.arn
-  desired_count                      = 1
-  launch_type                        = "FARGATE"
-  health_check_grace_period_seconds  = 120
+  name                              = "${var.name}-backend"
+  cluster                           = aws_ecs_cluster.this.id
+  task_definition                   = aws_ecs_task_definition.backend.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 120
 
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -509,11 +509,11 @@ resource "aws_ecs_service" "backend" {
 }
 
 resource "aws_ecs_service" "frontend" {
-  name            = "${var.name}-frontend"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "${var.name}-frontend"
+  cluster                           = aws_ecs_cluster.this.id
+  task_definition                   = aws_ecs_task_definition.frontend.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 60
 
   network_configuration {
