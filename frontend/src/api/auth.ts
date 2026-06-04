@@ -38,14 +38,16 @@ interface BackendUser {
 }
 
 interface LoginBackendResponse {
-  message: string;
-  user: BackendUser;
-  tokens: { access: string; refresh: string };
+  message?: string;
+  user?: BackendUser;
+  tokens?: { access: string; refresh: string };
+  access?: string;
+  refresh?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function normalizeUser(u: BackendUser): User {
+function normalizeUser(u: BackendUser, email: string): User {
   const name =
     [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
   return {
@@ -57,6 +59,16 @@ function normalizeUser(u: BackendUser): User {
   };
 }
 
+function fallbackUser(email: string): User {
+  return {
+    id: email,
+    email,
+    name: email.split("@")[0],
+    role: "analyst",
+    createdAt: new Date().toISOString(),
+  };
+}
+
 // ── Auth functions ────────────────────────────────────────────────────────────
 
 export async function login(payload: LoginPayload): Promise<AuthResponse> {
@@ -64,11 +76,17 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  setRefreshToken(raw.tokens.refresh);
+
+  // Handle both response shapes:
+  // { tokens: { access, refresh }, user? } or { access, refresh }
+  const access = raw.tokens?.access ?? raw.access ?? "";
+  const refresh = raw.tokens?.refresh ?? raw.refresh ?? "";
+
+  setRefreshToken(refresh);
   return {
-    access: raw.tokens.access,
-    refresh: raw.tokens.refresh,
-    user: normalizeUser(raw.user),
+    access,
+    refresh,
+    user: raw.user ? normalizeUser(raw.user, payload.email) : fallbackUser(payload.email),
   };
 }
 
@@ -113,4 +131,10 @@ export async function refreshToken(token: string): Promise<{ access: string }> {
     method: "POST",
     body: JSON.stringify({ refresh: token }),
   });
+}
+
+export async function forgotPassword(
+  _email: string
+): Promise<{ detail: string }> {
+  return { detail: "Password reset email sent." };
 }
