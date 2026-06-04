@@ -6,18 +6,11 @@ name: Deploy → Prod
 # Keep both files identical. Edit here, then copy to .github/workflows/.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Triggers only after CI passes on main.
-#
-# Pipeline:
-#   ci-gate ──► plan ──► approve ──► apply ──► deploy ──► summary
-#                   (manual gate via "production" GitHub Environment)
-#
-# Reviewers see the Terraform plan summary before approving.
-# The deploy itself builds Docker images on the EC2 instance — no registry.
+# Triggers on every push to main.
+# Infrastructure is provisioned manually — no Terraform in this pipeline.
+# Pipeline: approve (manual gate) ──► deploy (SSM) ──► summary
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
     branches: [main]
 
 concurrency:
@@ -30,7 +23,6 @@ permissions:
 
 env:
   AWS_REGION:    eu-west-1
-  TF_DIR:        devops/infra/environments/prod
   ENV_CONFIG:    devops/scripts/envs/prod.env
   DEPLOY_SCRIPT: devops/scripts/zero-downtime-deploy.sh
   SSM_WAIT:      devops/scripts/ssm-wait.sh
@@ -38,195 +30,41 @@ env:
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ── Guard ────────────────────────────────────────────────────────────────────
-  ci-gate:
-    name: CI gate
-    runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    steps:
-      - run: echo "CI passed on ${{ github.event.workflow_run.head_sha }} — starting prod pipeline"
-
-  # ── Terraform plan (read-only, no changes applied yet) ───────────────────────
-  plan:
-    name: Terraform plan (prod)
-    runs-on: ubuntu-latest
-    needs: ci-gate
-    outputs:
-      ec2_instance_id: ${{ steps.tf.outputs.ec2_instance_id }}
-      alb_dns_name:    ${{ steps.tf.outputs.alb_dns_name }}
-      has_changes:     ${{ steps.tf_plan.outputs.has_changes }}
-      plan_summary:    ${{ steps.tf_plan.outputs.summary }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
-          aws-region:     ${{ env.AWS_REGION }}
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.8"
-
-      - name: Terraform init
-        run: terraform init
-        working-directory: ${{ env.TF_DIR }}
-
-      - name: Terraform validate
-        run: terraform validate
-        working-directory: ${{ env.TF_DIR }}
-
-      - name: Terraform plan
-        id: tf_plan
-        run: |
-          set +e
-          terraform plan -out=tfplan -input=false -detailed-exitcode \
-            2>&1 | tee /tmp/tf-plan.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          set -e
-          case "$EXIT_CODE" in
-            0) echo "has_changes=false" >> "$GITHUB_OUTPUT"
-               echo "summary=No infrastructure changes" >> "$GITHUB_OUTPUT" ;;
-            2) echo "has_changes=true"  >> "$GITHUB_OUTPUT"
-               SUMMARY=$(grep -E '^Plan:' /tmp/tf-plan.txt | head -1 \
-                         || echo "Infrastructure changes detected")
-               echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT" ;;
-            *) cat /tmp/tf-plan.txt; exit 1 ;;
-          esac
-        working-directory: ${{ env.TF_DIR }}
-        env:
-          TF_VAR_app_db_password:       ${{ secrets.PROD_APP_DB_PASSWORD }}
-          TF_VAR_warehouse_db_password: ${{ secrets.PROD_WAREHOUSE_DB_PASSWORD }}
-          TF_VAR_acm_certificate_arn:   ${{ secrets.PROD_ACM_CERT_ARN }}
-
-      - name: Read current Terraform outputs
-        id: tf
-        run: |
-          echo "ec2_instance_id=$(terraform output -raw ec2_instance_id)" >> "$GITHUB_OUTPUT"
-          echo "alb_dns_name=$(terraform output -raw alb_dns_name)"       >> "$GITHUB_OUTPUT"
-        working-directory: ${{ env.TF_DIR }}
-
-      # Terraform plan output is visible in the job summary before reviewers approve
-      - name: Write plan to job summary
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" << EOF
-          ## Terraform Plan — Prod
-
-          **Result:** ${{ steps.tf_plan.outputs.summary }}
-
-          <details><summary>Full plan output</summary>
-
-          \`\`\`
-          $(cat /tmp/tf-plan.txt)
-          \`\`\`
-          </details>
-          EOF
-
-  # ── Manual approval gate ──────────────────────────────────────────────────────
-  # Reviewers see the plan summary above before clicking "Approve deployment"
-  # in the "production" GitHub Environment settings.
+  # ── Manual approval gate ─────────────────────────────────────────────────────
+  # A reviewer must approve before anything is deployed to production.
   approve:
     name: Await production approval
     runs-on: ubuntu-latest
-    needs: plan
     environment: production
     steps:
       - name: Approved
         run: |
           echo "Production deployment approved"
-          echo "Infra plan : ${{ needs.plan.outputs.plan_summary }}"
-          echo "Commit     : ${{ github.event.workflow_run.head_sha }}"
+          echo "Commit : ${{ github.sha }}"
+          echo "Pusher : ${{ github.actor }}"
 
-  # ── Terraform apply (only when the plan detected changes) ────────────────────
-  apply:
-    name: Terraform apply (prod)
-    runs-on: ubuntu-latest
-    needs: [plan, approve]
-    if: needs.plan.outputs.has_changes == 'true'
-    outputs:
-      ec2_instance_id: ${{ steps.tf.outputs.ec2_instance_id }}
-      alb_dns_name:    ${{ steps.tf.outputs.alb_dns_name }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
-          aws-region:     ${{ env.AWS_REGION }}
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.8"
-
-      - name: Terraform init
-        run: terraform init
-        working-directory: ${{ env.TF_DIR }}
-
-      # Re-plan with the same vars to obtain a fresh tfplan binary
-      # (the plan job's artifact is not persisted across jobs by default)
-      - name: Terraform plan (pre-apply)
-        run: terraform plan -out=tfplan -input=false
-        working-directory: ${{ env.TF_DIR }}
-        env:
-          TF_VAR_app_db_password:       ${{ secrets.PROD_APP_DB_PASSWORD }}
-          TF_VAR_warehouse_db_password: ${{ secrets.PROD_WAREHOUSE_DB_PASSWORD }}
-          TF_VAR_acm_certificate_arn:   ${{ secrets.PROD_ACM_CERT_ARN }}
-
-      - name: Terraform apply
-        run: terraform apply -input=false tfplan
-        working-directory: ${{ env.TF_DIR }}
-
-      - name: Read Terraform outputs
-        id: tf
-        run: |
-          echo "ec2_instance_id=$(terraform output -raw ec2_instance_id)" >> "$GITHUB_OUTPUT"
-          echo "alb_dns_name=$(terraform output -raw alb_dns_name)"       >> "$GITHUB_OUTPUT"
-        working-directory: ${{ env.TF_DIR }}
-
-  # ── Deploy ─────────────────────────────────────────────────────────────────────
+  # ── Deploy ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2 (prod)
     runs-on: ubuntu-latest
-    # apply may be skipped when there are no infra changes — fall back to plan outputs
-    needs: [plan, approve, apply]
-    if: |
-      always() &&
-      needs.approve.result == 'success' &&
-      (needs.apply.result == 'success' || needs.apply.result == 'skipped')
+    needs: approve
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
           aws-region:     ${{ env.AWS_REGION }}
-
-      - name: Resolve instance ID and ALB (apply > plan)
-        id: targets
-        run: |
-          EC2="${{ needs.apply.outputs.ec2_instance_id || needs.plan.outputs.ec2_instance_id }}"
-          ALB="${{ needs.apply.outputs.alb_dns_name    || needs.plan.outputs.alb_dns_name }}"
-          echo "ec2=$EC2" >> "$GITHUB_OUTPUT"
-          echo "alb=$ALB" >> "$GITHUB_OUTPUT"
 
       - name: Make SSM helper executable
         run: chmod +x "${{ env.SSM_WAIT }}"
 
       - name: Upload docker-compose, env config, and deploy script
         env:
-          INSTANCE: ${{ steps.targets.outputs.ec2 }}
+          INSTANCE: ${{ secrets.PROD_EC2_INSTANCE_ID }}
         run: |
           ssm_upload() {
             local src="$1" dst="$2" timeout="${3:-60}"
@@ -261,9 +99,10 @@ jobs:
 
       # Build on EC2 + canary pre-flight + zero-downtime swap + auto-rollback
       - name: Run zero-downtime deploy via SSM
+        id: ssm_deploy
         env:
-          INSTANCE:   ${{ steps.targets.outputs.ec2 }}
-          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          INSTANCE:   ${{ secrets.PROD_EC2_INSTANCE_ID }}
+          COMMIT_SHA: ${{ github.sha }}
           REPO_URL:   https://github.com/${{ github.repository }}.git
         run: |
           TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2 | cut -d'#' -f1 | tr -d '[:space:]')
@@ -287,10 +126,10 @@ jobs:
           echo "SSM Command ID: $CMD_ID"
           "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" "$TIMEOUT"
 
-      # End-to-end validation through the ALB with HTTPS
-      - name: Smoke test via ALB (HTTPS)
+      # End-to-end validation through the ALB (HTTPS in prod)
+      - name: Smoke test via ALB
         run: |
-          ALB="${{ steps.targets.outputs.alb }}"
+          ALB="${{ secrets.PROD_ALB_DNS_NAME }}"
           for i in $(seq 1 18); do
             HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
               --max-time 10 "https://$ALB/api-docs/" 2>/dev/null || echo "000")
@@ -313,8 +152,7 @@ jobs:
             --metric-data "MetricName=DeploymentCount,Value=1,Unit=Count,${DIMS}" \
             --region "${{ env.AWS_REGION }}" || true
 
-          # Write structured event to CloudWatch Logs for dashboard annotations.
-          EVENT="{\"sha\":\"${{ github.event.workflow_run.head_sha }}\",\"status\":\"${STATUS}\",\"run\":\"${{ github.event.workflow_run.id }}\"}"
+          EVENT="{\"sha\":\"${{ github.sha }}\",\"status\":\"${STATUS}\",\"run\":\"${{ github.run_id }}\"}"
           aws logs put-log-events \
             --log-group-name  "/insightflow/prod/deployments" \
             --log-stream-name "github-actions" \
@@ -325,7 +163,7 @@ jobs:
   summary:
     name: Deployment summary
     runs-on: ubuntu-latest
-    needs: [plan, deploy]
+    needs: [deploy]
     if: always()
     steps:
       - name: Write job summary
@@ -335,11 +173,12 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" << EOF
           ## ${ICON} Prod Deployment — ${STATUS}
 
-          | Field          | Value |
-          |----------------|-------|
-          | **Commit**     | \`${{ github.event.workflow_run.head_sha }}\` |
-          | **Branch**     | \`main\` |
-          | **Build**      | on EC2 — no container registry |
-          | **Infra plan** | ${{ needs.plan.outputs.plan_summary }} |
-          | **CI run**     | [#${{ github.event.workflow_run.id }}](${{ github.event.workflow_run.html_url }}) |
+          | Field       | Value |
+          |-------------|-------|
+          | **Commit**  | \`${{ github.sha }}\` |
+          | **Branch**  | \`main\` |
+          | **Pushed by** | ${{ github.actor }} |
+          | **Build**   | on EC2 — no container registry |
+          | **Run**     | [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | **ALB**     | https://${{ secrets.PROD_ALB_DNS_NAME }} |
           EOF
