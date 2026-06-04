@@ -10,9 +10,30 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.pagination import StandardResultsPagination
+
 from ..models.base import InjectionJob
+from ..serializers.ingestion_job import InjectionJobSerializer
 
 STALE_THRESHOLD = timedelta(minutes=10)
+
+
+class InjectionJobListView(APIView):
+    """
+    GET /api/ingestion/pos/jobs/
+
+    Returns a paginated list of all POS CSV ingestion jobs.
+    Secured — requires a valid JWT token.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        jobs = InjectionJob.objects.all()
+        paginator = StandardResultsPagination()
+        page = paginator.paginate_queryset(jobs, request)
+        serializer = InjectionJobSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 logger = logging.getLogger(__name__)
 
