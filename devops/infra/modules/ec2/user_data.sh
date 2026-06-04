@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Install Docker
-dnf install -y docker
+# Install system packages
+dnf install -y docker socat git
 systemctl enable --now docker
 
 # Docker Compose v2 plugin
@@ -19,6 +19,16 @@ usermod -aG docker ec2-user
 # App working directory
 mkdir -p /opt/insightflow
 chown ec2-user:ec2-user /opt/insightflow
+
+# Fetch the full app .env from Secrets Manager — written by Terraform/ops when
+# secrets change; the deploy script expects it at /opt/insightflow/.env.
+aws secretsmanager get-secret-value \
+  --region "${region}" \
+  --secret-id "${name}/app/env" \
+  --query SecretString \
+  --output text > /opt/insightflow/.env
+chmod 600 /opt/insightflow/.env
+chown ec2-user:ec2-user /opt/insightflow/.env
 
 # Authenticate Docker with ECR on boot (refreshed by cron every 11h)
 cat > /usr/local/bin/ecr-login.sh <<'EOF'
