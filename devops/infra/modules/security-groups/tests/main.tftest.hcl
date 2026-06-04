@@ -53,7 +53,7 @@ run "dev_mode_ssh_rule_present" {
   assert {
     condition = anytrue([
       for r in aws_security_group.ec2.ingress :
-      r.from_port == 22 && contains(r.cidr_blocks, "10.0.0.0/8")
+      r.from_port == 22 && r.cidr_blocks != null && contains(r.cidr_blocks, "10.0.0.0/8")
     ])
     error_message = "SSH rule must restrict access to the provided ssh_cidr_blocks"
   }
