@@ -85,6 +85,10 @@ die() { log "FATAL: $*"; exit 1; }
   || die "$APP_ENV_FILE not found — EC2 bootstrap must write app secrets here"
 mkdir -p "$REPO_DIR"
 
+# Symlink APP_ENV_FILE into the repo dir so docker-compose services that use
+# `env_file: .env` (relative path) resolve to the correct secrets file.
+ln -sf "$APP_ENV_FILE" "${REPO_DIR}/.env"
+
 # ── 1. Record rollback point ──────────────────────────────────────────────────
 PREV_TAG=$(grep -E '^DEPLOY_TAG=' "$APP_ENV_FILE" 2>/dev/null \
            | cut -d= -f2- || echo "local")
@@ -188,6 +192,12 @@ $COMPOSE up -d --no-deps --remove-orphans etl
 log "Rolling-replacing etl-listener and etl-worker..."
 $COMPOSE up -d --no-deps --remove-orphans etl-listener etl-worker
 
+log "Starting metabase (dashboard)..."
+$COMPOSE up -d --no-deps --remove-orphans metabase
+
+log "Running metabase-setup (one-shot, registers warehouse data source)..."
+$COMPOSE up --no-deps --remove-orphans metabase-setup
+
 # ── 6. Post-deploy health check ───────────────────────────────────────────────
 # Allow extra time on first deploy — migrations + seed_data can take several minutes.
 log "Post-deploy health check (port 8080)..."
@@ -207,7 +217,7 @@ if [[ "$LIVE_OK" != "true" ]]; then
   grep -v '^DEPLOY_TAG=' "$APP_ENV_FILE" > "$TMP"
   echo "DEPLOY_TAG=${PREV_TAG}" >> "$TMP"
   mv "$TMP" "$APP_ENV_FILE"
-  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend etl-listener etl-worker
+  $COMPOSE up -d --no-deps --remove-orphans backend celery-worker frontend etl-listener etl-worker metabase
   sleep 15
   RB_HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
             "http://127.0.0.1:8080${HC_PATH}" 2>/dev/null || echo "000")
