@@ -301,6 +301,30 @@ class TestValidatePosRow:
         errors = validate_pos_row(row, row_num=2)
         assert any(e["field"] == "total" and "positive" in e["error"] for e in errors)
 
+    def test_date_iso_datetime_accepted(self):
+        """ISO 8601 datetime with time component passes validation."""
+        for date_str in [
+            "2025-07-25T17:32:26",
+            "2025-07-25T17:32:26.865133",
+            "2026-03-12T05:52:26",
+        ]:
+            row = {
+                "transaction_id": "12345",
+                "store_id": "5",
+                "cashier_id": "101",
+                "product_sku": "SKU001",
+                "quantity": "10",
+                "unit_price": "25.99",
+                "discount_applied": "0.00",
+                "total": "259.90",
+                "date": date_str,
+            }
+            errors = validate_pos_row(row, row_num=2)
+            date_errors = [e for e in errors if e["field"] == "date"]
+            assert (
+                len(date_errors) == 0
+            ), f"ISO datetime {date_str} failed: {date_errors}"
+
     def test_date_accepted_formats(self):
         """All accepted date formats pass validation."""
         for date_str in ["2024-06-01", "01/06/2024", "06/01/2024"]:

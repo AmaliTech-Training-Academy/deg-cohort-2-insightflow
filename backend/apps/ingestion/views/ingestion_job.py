@@ -4,6 +4,8 @@ from datetime import timedelta
 from celery.result import AsyncResult
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +28,60 @@ class IngestionJobStatusView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Poll ingestion job status",
+        description=(
+            "Returns the current state of a CSV ingestion job. "
+            "Poll this endpoint after receiving a 202 from POST /api/ingestion/pos/. "
+            "The error_report field is only present once status is "
+            "'completed' or 'failed'."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="job_id",
+                location=OpenApiParameter.PATH,
+                description="ID of the ingestion job returned by the upload endpoint.",
+                required=True,
+                type=int,
+            )
+        ],
+        responses={
+            200: inline_serializer(
+                name="IngestionJobStatus",
+                fields={
+                    "job_id": drf_serializers.IntegerField(),
+                    "status": drf_serializers.ChoiceField(
+                        choices=["pending", "running", "completed", "failed"]
+                    ),
+                    "total_rows": drf_serializers.IntegerField(),
+                    "valid_rows": drf_serializers.IntegerField(
+                        help_text="Rows successfully inserted into the database."
+                    ),
+                    "rejected_rows": drf_serializers.IntegerField(
+                        help_text=(
+                            "Rows that passed CSV validation but were rejected "
+                            "at the DB level (unknown store, cashier, or product)."
+                        )
+                    ),
+                    "error_rows": drf_serializers.IntegerField(
+                        help_text="Rows that failed CSV format/type validation."
+                    ),
+                    "created_at": drf_serializers.DateTimeField(),
+                    "updated_at": drf_serializers.DateTimeField(),
+                    "error_report": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Only present when status is 'completed' or 'failed'."
+                        ),
+                    ),
+                },
+            ),
+            404: inline_serializer(
+                name="JobNotFound",
+                fields={"detail": drf_serializers.CharField()},
+            ),
+        },
+    )
     def get(self, request, job_id):
         job = get_object_or_404(InjectionJob, id=job_id)
 
@@ -46,6 +102,7 @@ class IngestionJobStatusView(APIView):
             "status": job.status,
             "total_rows": job.total_rows,
             "valid_rows": job.valid_rows,
+            "rejected_rows": job.rejected_rows,
             "error_rows": job.error_rows,
             "created_at": job.created_at,
             "updated_at": job.updated_at,
