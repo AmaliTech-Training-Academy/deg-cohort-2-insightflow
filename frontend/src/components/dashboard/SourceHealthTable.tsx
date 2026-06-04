@@ -31,31 +31,19 @@ export function SourceHealthTable({ sources }: SourceHealthTableProps) {
         <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700 text-sm">
           <thead className="bg-gray-50 dark:bg-slate-700/50">
             <tr>
-              {["Source", "Type", "Last Sync", "Status"].map((h) => (
-                <th
-                  key={h}
-                  className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400"
-                >
-                  {h}
-                </th>
-              ))}
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Source</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Type</th>
+              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Last Sync</th>
+              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
             {sources.map((src) => (
               <tr key={src.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                <td className="px-5 py-3 font-medium text-gray-900 dark:text-slate-100">
-                  {src.name}
-                </td>
-                <td className="px-5 py-3 text-gray-500 dark:text-slate-400">
-                  {SOURCE_LABELS[src.type] ?? src.type}
-                </td>
-                <td className="px-5 py-3 text-gray-500 dark:text-slate-400">
-                  {relativeTime(src.lastSyncAt)}
-                </td>
-                <td className="px-5 py-3">
-                  <StatusBadge status={src.status} />
-                </td>
+                <td className="px-5 py-3.5 font-medium text-gray-900 dark:text-slate-100 whitespace-nowrap">{src.name}</td>
+                <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 whitespace-nowrap">{SOURCE_LABELS[src.type] ?? src.type}</td>
+                <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 whitespace-nowrap text-right tabular-nums">{relativeTime(src.lastSyncAt)}</td>
+                <td className="px-5 py-3.5 text-right whitespace-nowrap"><StatusBadge status={src.status} /></td>
               </tr>
             ))}
           </tbody>
