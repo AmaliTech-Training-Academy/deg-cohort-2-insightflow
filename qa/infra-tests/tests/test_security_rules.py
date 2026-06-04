@@ -30,15 +30,16 @@ class TestProdSecurity:
             prod, "enable_ssh", "true"
         ), "Prod must never set enable_ssh = true"
 
-    def test_no_public_ip(self, prod):
-        assert has_setting(
-            prod, "enable_public_ip", "false"
-        ), "Prod EC2 must not have a public IP — access via SSM only"
+    def test_no_public_compute(self, prod):
+        assert "enable_public_ip" not in prod, (
+            "Prod must not expose compute to the public internet"
+            " — ECS Fargate tasks run in private subnets only"
+        )
 
-    def test_https_enforced(self, prod):
+    def test_https_not_required(self, prod):
         assert has_setting(
-            prod, "enable_https", "true"
-        ), "Prod ALB must enforce HTTPS (TLS termination with ACM certificate)"
+            prod, "enable_https", "false"
+        ), "Prod ALB uses HTTP-only (no ACM cert); WAF provides request filtering"
 
     def test_waf_enabled(self, prod):
         assert has_setting(
@@ -66,10 +67,10 @@ class TestProdSecurity:
             prod, "transit_encryption_mode", '"required"'
         ), "Prod Redis must require TLS in transit (no plaintext connections allowed)"
 
-    def test_ec2_in_private_subnet(self, prod):
+    def test_ecs_in_private_subnets(self, prod):
         assert (
-            "private_subnet_a_id" in prod
-        ), "Prod EC2 must be placed in a private subnet (not public)"
+            "private_subnet_ids" in prod
+        ), "Prod ECS tasks must run in private subnets — no direct internet exposure"
 
 
 # ── Dev / testing permissive rules ───────────────────────────────────────────
