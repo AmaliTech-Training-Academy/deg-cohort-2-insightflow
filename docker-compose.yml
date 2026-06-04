@@ -33,6 +33,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: insightflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -49,9 +62,16 @@ services:
       DB_NAME: insightflow_app
       DB_USER: insightflow
       DB_PASSWORD: insightflow_pass
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres-app:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_data &&
+             gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
   # ── One-shot init container: creates the star-schema DDL then exits ──────────
   schema-init:
@@ -93,9 +113,13 @@ services:
         condition: service_completed_successfully
       postgres-app:
         condition: service_healthy
-    command: python etl_pipeline.py
-    restart: "no"
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+             python etl_pipeline.py"
 
 volumes:
   pgdata-app:
   pgdata-warehouse:
+  redis-data:
