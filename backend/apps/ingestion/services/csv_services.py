@@ -13,7 +13,8 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 
 from ..models.base import InjectionJob
-from ..models.pos import PosTransaction, PosTransactionLine
+from ..models.inventory import Product, Store
+from ..models.pos import Cashier, PosTransaction, PosTransactionLine
 from ..validators.pos import validate_pos_file_columns, validate_pos_row
 
 logger = logging.getLogger(__name__)
@@ -87,11 +88,15 @@ class POSIngestionService:
 
     def process_job(self, job: InjectionJob) -> None:
         """
-        Reads the saved CSV row by row.
-        - Groups rows by transaction_id
-        - Creates PosTransaction records
-        - Creates PosTransactionLine records for each product
-        - Logs errors for invalid rows
+        Reads the saved CSV, validates all rows, then inserts into DB using
+        two bulk_create calls instead of one DB round-trip per transaction.
+
+        Optimisations vs. the naive approach:
+        - Vectorized validation: pandas/numpy column ops; Python loop only over
+          the (small) invalid subset for detailed error messages.
+        - Single bulk_create for all PosTransaction rows (ignore_conflicts keeps
+          idempotency — re-uploading the same file is safe).
+        - Single bulk_create for all PosTransactionLine rows across every txn.
         """
         job.status = InjectionJob.StatusChoices.RUNNING
         job.save(update_fields=["status"])
@@ -100,109 +105,167 @@ class POSIngestionService:
             df = pd.read_csv(job.file.path)
             df.columns = df.columns.str.strip().str.lower()
 
-            valid_rows = []
-            row_errors = []
+            # ── Phase 1: Vectorized validation ───────────────────────────
+            # Null / empty checks across all required columns (numpy-level)
+            required = [
+                "transaction_id",
+                "store_id",
+                "cashier_id",
+                "product_sku",
+                "quantity",
+                "unit_price",
+                "discount_applied",
+                "total",
+                "date",
+            ]
+            null_mask = df[required].isna().any(axis=1)
+            for col in ["transaction_id", "store_id", "product_sku"]:
+                null_mask |= df[col].astype(str).str.strip() == ""
 
-            # ── Phase 1: Validate all rows ────────────────────────
-            # to_dict(orient="records") is significantly faster than iterrows
-            for idx, row_dict in enumerate(df.to_dict(orient="records")):
-                row_num = idx + 2  # +1 header, +1 for 1-based display
-                # Replace float NaN with None so validators see proper nulls
+            # Numeric field validation (vectorized, C-level)
+            cashier_num = pd.to_numeric(df["cashier_id"], errors="coerce")
+            qty_num = pd.to_numeric(df["quantity"], errors="coerce")
+            price_num = pd.to_numeric(df["unit_price"], errors="coerce")
+            disc_num = pd.to_numeric(df["discount_applied"], errors="coerce")
+            total_num = pd.to_numeric(df["total"], errors="coerce")
+
+            numeric_ok = (
+                cashier_num.notna()
+                & (cashier_num > 0)
+                & qty_num.notna()
+                & (qty_num > 0)
+                & price_num.notna()
+                & (price_num > 0)
+                & disc_num.notna()
+                & (disc_num >= 0)
+                & total_num.notna()
+                & (total_num > 0)
+            )
+
+            # Date parsing via apply (C-level string ops per cell)
+            df["_parsed_date"] = df["date"].apply(self._parse_date_field)
+            date_ok = df["_parsed_date"].notna()
+
+            valid_mask = ~null_mask & numeric_ok & date_ok
+            valid_df = df[valid_mask].copy()
+            invalid_df = df[~valid_mask]
+
+            # Collect detailed errors only for invalid rows (small subset)
+            row_errors: list = []
+            for idx, row in invalid_df.iterrows():
                 row_dict = {
                     k: (None if (isinstance(v, float) and pd.isna(v)) else v)
-                    for k, v in row_dict.items()
+                    for k, v in row.to_dict().items()
+                    if not k.startswith("_")
                 }
+                row_errors.extend(validate_pos_row(row_dict, row_num=idx + 2))
 
-                errors = validate_pos_row(row_dict, row_num=row_num)
+            # Intermediate progress save (DB-level rejections not yet known)
+            job.error_rows = len(invalid_df)
+            job.save(update_fields=["error_rows"])
 
-                if errors:
-                    row_errors.extend(errors)
-                else:
-                    valid_rows.append((idx, row_dict))
-
-                # live progress update every 500 rows
-                if idx > 0 and idx % 500 == 0:
-                    job.valid_rows = len(valid_rows)
-                    job.error_rows = len(row_errors)
-                    job.save(update_fields=["valid_rows", "error_rows"])
-
-            # ── Phase 2: Insert into PosTransaction + PosTransactionLine ──
+            # ── Phase 2: Bulk DB insert ───────────────────────────────────
             with db_transaction.atomic():
-                # Group valid rows by transaction_id
+                # Three FK sets — one query each, O(1) membership check in loop
+                valid_store_ids = set(Store.objects.values_list("storeId", flat=True))
+                valid_cashier_ids = set(
+                    Cashier.objects.values_list("cashierId", flat=True)
+                )
+                valid_product_skus = set(
+                    Product.objects.values_list("productSKU", flat=True)
+                )
+
+                # Group rows by transaction_id (pandas groupby — C-level)
                 transactions_map: dict = {}
-                for _idx, row_dict in valid_rows:
-                    txn_id = row_dict["transaction_id"]
-                    if txn_id not in transactions_map:
-                        transactions_map[txn_id] = {
-                            "store_id": row_dict["store_id"],
-                            "cashier_id": row_dict["cashier_id"],
-                            "date": row_dict["date"],
-                            "lines": [],
-                        }
-                    transactions_map[txn_id]["lines"].append(row_dict)
+                for txn_id, group in valid_df.groupby("transaction_id"):
+                    first = group.iloc[0]
+                    transactions_map[txn_id] = {
+                        "store_id": first["store_id"],
+                        "cashier_id": first["cashier_id"],
+                        "parsed_date": first["_parsed_date"],
+                        "lines": group.to_dict("records"),
+                    }
+
+                # Build all PosTransaction objects — zero DB calls
+                txn_objects: list = []
+                skipped_txns: set = set()
+                db_rejected_count: int = 0
 
                 for txn_id, txn_data in transactions_map.items():
-                    # ── Parse date — produce a timezone-aware UTC datetime ──
-                    date_str = str(txn_data["date"])
-                    parsed_date = None
-                    for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]:
-                        try:
-                            naive = dt.strptime(date_str, fmt).replace(
-                                hour=0, minute=0, second=0
-                            )
-                            parsed_date = timezone.make_aware(naive, timezone.utc)
-                            break
-                        except ValueError:
-                            continue
-
-                    if parsed_date is None:
+                    if int(txn_data["store_id"]) not in valid_store_ids:
                         row_errors.append(
                             {
                                 "transaction_id": txn_id,
-                                "field": "date",
-                                "error": f'Cannot parse date "{date_str}"',
+                                "field": "store_id",
+                                "error": f'Store {txn_data["store_id"]} does not exist',
                             }
                         )
+                        skipped_txns.add(txn_id)
+                        db_rejected_count += len(txn_data["lines"])
                         continue
 
-                    # ── PosTransaction — get_or_create prevents duplicate key ──
-                    try:
-                        pos_txn, created = PosTransaction.objects.get_or_create(
+                    if int(txn_data["cashier_id"]) not in valid_cashier_ids:
+                        row_errors.append(
+                            {
+                                "transaction_id": txn_id,
+                                "field": "cashier_id",
+                                "error": (
+                                    f"Cashier {txn_data['cashier_id']}"
+                                    " does not exist"
+                                ),
+                            }
+                        )
+                        skipped_txns.add(txn_id)
+                        db_rejected_count += len(txn_data["lines"])
+                        continue
+
+                    naive = txn_data["parsed_date"]
+                    aware = (
+                        timezone.make_aware(naive, timezone.utc)
+                        if timezone.is_naive(naive)
+                        else naive
+                    )
+                    txn_objects.append(
+                        PosTransaction(
                             posTransactionId=int(txn_id),
-                            defaults={
-                                "storeId_id": int(txn_data["store_id"]),
-                                "cashierId_id": int(txn_data["cashier_id"]),
-                                "transactionDatetime": parsed_date,
-                            },
+                            storeId_id=int(txn_data["store_id"]),
+                            cashierId_id=int(txn_data["cashier_id"]),
+                            transactionDatetime=aware,
                         )
-                    except Exception as e:
-                        row_errors.append(
-                            {
-                                "transaction_id": txn_id,
-                                "field": "PosTransaction",
-                                "error": f"Failed to create transaction: {e}",
-                            }
-                        )
-                        continue
+                    )
 
-                    if not created:
-                        # Already ingested — skip line items to avoid duplicates
-                        logger.warning(
-                            f"Job {job.id} — txn {txn_id} already exists, skipping"
-                        )
-                        continue
+                # ONE bulk_create for ALL transactions
+                # ignore_conflicts=True makes re-uploads idempotent
+                if txn_objects:
+                    PosTransaction.objects.bulk_create(
+                        txn_objects, ignore_conflicts=True
+                    )
 
-                    # ── Build PosTransactionLine records ─────────────────
-                    line_records = []
+                # Build ALL PosTransactionLine objects — zero DB calls
+                all_line_records: list = []
+                for txn_id, txn_data in transactions_map.items():
+                    if txn_id in skipped_txns:
+                        continue
                     for line_idx, line_dict in enumerate(txn_data["lines"], 1):
+                        sku = line_dict["product_sku"]
+                        if sku not in valid_product_skus:
+                            row_errors.append(
+                                {
+                                    "transaction_id": txn_id,
+                                    "field": "product_sku",
+                                    "error": f"Product {sku} does not exist",
+                                }
+                            )
+                            db_rejected_count += 1
+                            continue
+                        # Zero-pad both parts so txn=12/line=31 ≠ txn=123/line=1
+                        line_id = int(f"{int(txn_id):012d}{line_idx:03d}")
                         try:
-                            # Zero-pad both parts so txn=12/line=31 ≠ txn=123/line=1
-                            line_id = int(f"{int(txn_id):012d}{line_idx:03d}")
-                            line_records.append(
+                            all_line_records.append(
                                 PosTransactionLine(
                                     lineId=line_id,
-                                    posTransactionId=pos_txn,
-                                    productSKU_id=line_dict["product_sku"],
+                                    posTransactionId_id=int(txn_id),
+                                    productSKU_id=sku,
                                     quantity=int(line_dict["quantity"]),
                                     unitPrice=Decimal(str(line_dict["unit_price"])),
                                     discountApplied=Decimal(
@@ -220,31 +283,25 @@ class POSIngestionService:
                                 }
                             )
 
-                    if line_records:
-                        try:
-                            PosTransactionLine.objects.bulk_create(
-                                line_records, batch_size=1000
-                            )
-                        except Exception as e:
-                            row_errors.append(
-                                {
-                                    "transaction_id": txn_id,
-                                    "field": "bulk_insert",
-                                    "error": f"Bulk insert failed: {e}",
-                                }
-                            )
+                # ONE bulk_create for ALL lines across every transaction
+                if all_line_records:
+                    PosTransactionLine.objects.bulk_create(
+                        all_line_records,
+                        batch_size=1000,
+                        ignore_conflicts=True,
+                    )
 
-                # ── Mark job complete ────
                 job.status = InjectionJob.StatusChoices.COMPLETED
-                job.valid_rows = len(valid_rows)
-                job.error_rows = len(row_errors)
+                job.valid_rows = len(valid_df) - db_rejected_count
+                job.rejected_rows = db_rejected_count
+                job.error_rows = len(invalid_df)
                 job.error_report = {"row_errors": row_errors} if row_errors else {}
                 job.save()
 
             logger.info(
                 f"POS job {job.id} done — "
-                f"valid={len(valid_rows)}, errors={len(row_errors)}, "
-                f"transactions={len(transactions_map)}"
+                f"valid={len(valid_df)}, errors={len(row_errors)}, "
+                f"transactions={len(txn_objects)}"
             )
 
         except Exception as e:
@@ -255,6 +312,25 @@ class POSIngestionService:
             raise
 
     # ── private ───────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_date_field(val) -> dt | None:
+        """Parse a single date/datetime cell; return None if unparseable."""
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return None
+        raw = str(val).strip()
+        if not raw:
+            return None
+        try:
+            return dt.fromisoformat(raw)
+        except ValueError:
+            pass
+        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]:
+            try:
+                return dt.strptime(raw, fmt)
+            except ValueError:
+                continue
+        return None
 
     def _count_rows(self, file) -> int:
         try:

@@ -1,0 +1,38 @@
+{
+  "family": "insightflow-prod-celery-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/insightflow-prod-ecs-execution",
+  "taskRoleArn":      "arn:aws:iam::ACCOUNT_ID:role/insightflow-prod-ecs-task",
+  "containerDefinitions": [
+    {
+      "name": "celery-worker",
+      "image": "PLACEHOLDER",
+      "essential": true,
+      "command": ["celery", "-A", "insightflow", "worker", "--loglevel=info", "--concurrency=2"],
+      "environment": [
+        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings" },
+        { "name": "DEBUG",                  "value": "False" },
+        { "name": "DB_PORT",                "value": "5432" }
+      ],
+      "secrets": [
+        { "name": "DJANGO_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/app/secret-key" },
+        { "name": "DB_HOST",           "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:host::" },
+        { "name": "DB_NAME",           "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:dbname::" },
+        { "name": "DB_USER",           "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:username::" },
+        { "name": "DB_PASSWORD",       "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:password::" },
+        { "name": "REDIS_URL",         "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/redis/endpoint:url::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/insightflow/prod/celery-worker",
+          "awslogs-region":        "AWS_REGION",
+          "awslogs-stream-prefix": "celery-worker"
+        }
+      }
+    }
+  ]
+}

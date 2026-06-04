@@ -34,7 +34,12 @@ const NAV: NavSection[] = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -53,15 +58,30 @@ export function Sidebar() {
     : "Pipeline Operator";
 
   return (
-    <aside className="w-60 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shrink-0">
+    <aside className={`
+      fixed inset-y-0 left-0 z-30 w-60 flex flex-col shrink-0
+      bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800
+      transition-transform duration-200 ease-in-out
+      ${open ? "translate-x-0" : "-translate-x-full"}
+      md:relative md:translate-x-0 md:z-auto
+    `}>
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-100 dark:border-slate-800">
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-100 dark:border-slate-800 relative">
         <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shrink-0">
           <WaveformIcon />
         </div>
         <span className="text-sm font-bold tracking-tight text-gray-900 dark:text-white">
           InsightFlow
         </span>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden ml-auto p-1.5 rounded-md text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Close menu"
+          >
+            <CloseIcon />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -154,6 +174,14 @@ export function Sidebar() {
 }
 
 /* ─── Icons ───────────────────────────────────────────────── */
+
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
 
 function WaveformIcon() {
   return (

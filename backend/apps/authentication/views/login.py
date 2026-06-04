@@ -9,7 +9,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from ..serializers import LoginSerializer, UserSerializer
+from ..serializers import LoginSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,6 @@ class LoginView(APIView):
             logger.info(f"User logged in: {user.email}", extra={"user_id": user.id})
             return Response(
                 {
-                    "message": "Login successful",
-                    "user": UserSerializer(user).data,
                     "tokens": {
                         "access": str(refresh.access_token),
                         "refresh": str(refresh),

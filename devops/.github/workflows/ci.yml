@@ -96,12 +96,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install gitleaks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-            | grep '"tag_name"' | cut -d'"' -f4 | sed 's/v//')
+          VERSION=$(gh release view --repo gitleaks/gitleaks --json tagName -q .tagName | sed 's/^v//')
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
             | tar -xz gitleaks
           sudo mv gitleaks /usr/local/bin/
+          gitleaks version
 
       - name: Scan for secrets
         run: gitleaks detect --source . --redact --verbose
