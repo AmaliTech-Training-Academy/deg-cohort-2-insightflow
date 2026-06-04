@@ -8,6 +8,7 @@ from typing import Any
 
 import pandas as pd
 from etl.lineage import LineageEvent, LineageTracker
+from psycopg2.extras import execute_values
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -16,15 +17,19 @@ log = logging.getLogger("insightflow.load")
 _SOURCE_DB = "insightflow_app"
 _WAREHOUSE_DB = "insightflow_star_schema"
 
+# Rows per round-trip for bulk inserts.
+_BATCH_SIZE = 1000
+
 # Static SQL for each lookup dimension — avoids dynamic string construction.
 # All identifiers are literals; no user input reaches these strings.
 _LOOKUP_SQL: dict[str, dict[str, str]] = {
     "dimStore": {
         "insert": (
             'INSERT INTO "dimStore" ("storeId", "storeName", "province") '
-            "VALUES (:storeId, :storeName, :province) "
+            "VALUES %s "
             'ON CONFLICT ("storeId") DO NOTHING'
         ),
+        "template": "(%(storeId)s, %(storeName)s, %(province)s)",
         "select": (
             'SELECT "storeId", "storeKey" FROM "dimStore" '
             'WHERE "storeId" = ANY(:names)'
@@ -33,9 +38,10 @@ _LOOKUP_SQL: dict[str, dict[str, str]] = {
     "dimGeography": {
         "insert": (
             'INSERT INTO "dimGeography" ("province", "country") '
-            "VALUES (:province, :country) "
+            "VALUES %s "
             'ON CONFLICT ("province", "country") DO NOTHING'
         ),
+        "template": "(%(province)s, %(country)s)",
         "select": (
             'SELECT "province", "geographyKey" FROM "dimGeography" '
             'WHERE "province" = ANY(:names)'
@@ -44,9 +50,10 @@ _LOOKUP_SQL: dict[str, dict[str, str]] = {
     "dimChannel": {
         "insert": (
             'INSERT INTO "dimChannel" ("channelName", "channelType") '
-            "VALUES (:channelName, :channelType) "
+            "VALUES %s "
             'ON CONFLICT ("channelName") DO NOTHING'
         ),
+        "template": "(%(channelName)s, %(channelType)s)",
         "select": (
             'SELECT "channelName", "channelKey" FROM "dimChannel" '
             'WHERE "channelName" = ANY(:names)'
@@ -55,9 +62,10 @@ _LOOKUP_SQL: dict[str, dict[str, str]] = {
     "dimPaymentMethod": {
         "insert": (
             'INSERT INTO "dimPaymentMethod" ("methodName", "methodType") '
-            "VALUES (:methodName, :methodType) "
+            "VALUES %s "
             'ON CONFLICT ("methodName") DO NOTHING'
         ),
+        "template": "(%(methodName)s, %(methodType)s)",
         "select": (
             'SELECT "methodName", "paymentMethodKey" FROM "dimPaymentMethod" '
             'WHERE "methodName" = ANY(:names)'
@@ -66,15 +74,50 @@ _LOOKUP_SQL: dict[str, dict[str, str]] = {
     "dimOrderStatus": {
         "insert": (
             'INSERT INTO "dimOrderStatus" ("statusName") '
-            "VALUES (:statusName) "
+            "VALUES %s "
             'ON CONFLICT ("statusName") DO NOTHING'
         ),
+        "template": "(%(statusName)s,)",
         "select": (
             'SELECT "statusName", "orderStatusKey" FROM "dimOrderStatus" '
             'WHERE "statusName" = ANY(:names)'
         ),
     },
 }
+
+
+def _bulk_insert(
+    conn: Connection,
+    sql: str,
+    rows: list[dict],
+    template: str,
+    fetch: bool = False,
+) -> list[tuple]:
+    """Bulk INSERT via psycopg2 execute_values.
+
+    Generates one ``INSERT ... VALUES (...), (...), ...`` per *_BATCH_SIZE*
+    rows instead of one round-trip per row, cutting load time dramatically
+    for large datasets against remote databases.
+
+    Parameters
+    ----------
+    conn:
+        Active SQLAlchemy connection (within a transaction).
+    sql:
+        INSERT statement using ``%s`` as the values placeholder.
+    rows:
+        List of parameter dicts.
+    template:
+        psycopg2 row template, e.g. ``"(%(col1)s, %(col2)s)"``.
+    fetch:
+        When True, return rows produced by a ``RETURNING`` clause.
+    """
+    cursor = conn.connection.cursor()
+    execute_values(cursor, sql, rows, template=template, page_size=_BATCH_SIZE,
+                   fetch=fetch)
+    if fetch:
+        return list(cursor.fetchall())
+    return []
 
 
 class Loader:
@@ -91,7 +134,7 @@ class Loader:
     def upsert_dim_date(
         self, dates_df: pd.DataFrame, conn: Connection
     ) -> dict[date, int]:
-        """INSERT … ON CONFLICT ("fullDate") DO NOTHING.
+        """Bulk INSERT … ON CONFLICT ("fullDate") DO NOTHING.
 
         Returns
         -------
@@ -101,20 +144,22 @@ class Loader:
             return {}
 
         rows = dates_df.to_dict(orient="records")
-        conn.execute(
-            text("""
-                INSERT INTO "dimDate"
-                    ("fullDate", year, quarter, month, "monthName",
-                     "weekNumber", "dayName", "isWeekend", "isPublicHoliday")
-                VALUES
-                    (:fullDate, :year, :quarter, :month, :monthName,
-                     :weekNumber, :dayName, :isWeekend, :isPublicHoliday)
-                ON CONFLICT ("fullDate") DO NOTHING
-                """),
-            rows,
+        _bulk_insert(
+            conn,
+            sql=(
+                'INSERT INTO "dimDate" '
+                '("fullDate", year, quarter, month, "monthName", '
+                '"weekNumber", "dayName", "isWeekend", "isPublicHoliday") '
+                "VALUES %s "
+                'ON CONFLICT ("fullDate") DO NOTHING'
+            ),
+            rows=rows,
+            template=(
+                "(%(fullDate)s, %(year)s, %(quarter)s, %(month)s, %(monthName)s,"
+                " %(weekNumber)s, %(dayName)s, %(isWeekend)s, %(isPublicHoliday)s)"
+            ),
         )
 
-        # Fetch the keys for all dates we just upserted
         result = conn.execute(
             text(
                 'SELECT "fullDate", "dateKey" FROM "dimDate"'
@@ -137,11 +182,11 @@ class Loader:
     def upsert_dim_product(
         self, products_df: pd.DataFrame, conn: Connection
     ) -> dict[str, int]:
-        """SCD Type 2 upsert for dimProduct.
+        """SCD Type 2 upsert for dimProduct — batched.
 
-        * New SKUs are inserted.
-        * Existing SKUs with changed productName or categoryName are expired
-          (validTo = today, isCurrent = False) and a new row is inserted.
+        Fetches all existing active records in ONE query, compares in Python,
+        then issues a single bulk UPDATE (expire changed rows) and a single
+        bulk INSERT (new rows + new versions), returning the key mapping.
 
         Returns
         -------
@@ -151,6 +196,22 @@ class Loader:
             return {}
 
         today = date.today()
+        skus = products_df["productSKU"].tolist()
+
+        # 1. Fetch ALL current active rows for all SKUs in one query.
+        result = conn.execute(
+            text("""
+                SELECT "productKey", "productSKU", "productName", "categoryName"
+                FROM "dimProduct"
+                WHERE "productSKU" = ANY(:skus) AND "isCurrent" = TRUE
+            """),
+            {"skus": skus},
+        )
+        existing: dict[str, Any] = {row.productSKU: row for row in result}
+
+        # 2. Classify each row in Python.
+        to_expire: list[int] = []
+        to_insert: list[dict] = []
         sku_to_key: dict[str, int] = {}
 
         for _, row in products_df.iterrows():
@@ -158,73 +219,61 @@ class Loader:
             product_name = row.get("productName")
             category_name = row.get("categoryName")
 
-            # Fetch the current active row for this SKU
-            existing = conn.execute(
-                text("""
-                    SELECT "productKey", "productName", "categoryName"
-                    FROM "dimProduct"
-                    WHERE "productSKU" = :sku AND "isCurrent" = TRUE
-                    LIMIT 1
-                    """),
-                {"sku": sku},
-            ).fetchone()
-
-            if existing is None:
-                # New product — insert
-                result = conn.execute(
-                    text("""
-                        INSERT INTO "dimProduct"
-                            ("productSKU", "productName", "categoryName",
-                             "validFrom", "validTo", "isCurrent")
-                        VALUES
-                            (:sku, :productName, :categoryName,
-                             :validFrom, NULL, TRUE)
-                        RETURNING "productKey"
-                        """),
+            if sku not in existing:
+                to_insert.append(
                     {
                         "sku": sku,
                         "productName": product_name,
                         "categoryName": category_name,
                         "validFrom": today,
-                    },
+                    }
                 )
-                sku_to_key[sku] = int(result.scalar_one())
             else:
-                changed = (
-                    existing.productName != product_name
-                    or existing.categoryName != category_name
-                )
-                if changed:
-                    # Expire old row
-                    conn.execute(
-                        text("""
-                            UPDATE "dimProduct"
-                            SET "validTo" = :today, "isCurrent" = FALSE
-                            WHERE "productKey" = :pk
-                            """),
-                        {"today": today, "pk": existing.productKey},
-                    )
-                    # Insert new version
-                    result = conn.execute(
-                        text("""
-                            INSERT INTO "dimProduct"
-                                ("productSKU", "productName", "categoryName",
-                                 "validFrom", "validTo", "isCurrent")
-                            VALUES
-                                (:sku, :productName, :categoryName,
-                                 :validFrom, NULL, TRUE)
-                            RETURNING "productKey"
-                            """),
+                ex = existing[sku]
+                if ex.productName != product_name or ex.categoryName != category_name:
+                    to_expire.append(ex.productKey)
+                    to_insert.append(
                         {
                             "sku": sku,
                             "productName": product_name,
                             "categoryName": category_name,
                             "validFrom": today,
-                        },
+                        }
                     )
-                    sku_to_key[sku] = int(result.scalar_one())
                 else:
-                    sku_to_key[sku] = existing.productKey
+                    sku_to_key[sku] = ex.productKey
+
+        # 3. Expire changed rows in ONE UPDATE.
+        if to_expire:
+            conn.execute(
+                text("""
+                    UPDATE "dimProduct"
+                    SET "validTo" = :today, "isCurrent" = FALSE
+                    WHERE "productKey" = ANY(:keys)
+                """),
+                {"today": today, "keys": to_expire},
+            )
+
+        # 4. Bulk INSERT new rows, get back SKU → key via RETURNING.
+        if to_insert:
+            returned = _bulk_insert(
+                conn,
+                sql=(
+                    'INSERT INTO "dimProduct" '
+                    '("productSKU", "productName", "categoryName",'
+                    ' "validFrom", "validTo", "isCurrent") '
+                    "VALUES %s "
+                    'RETURNING "productSKU", "productKey"'
+                ),
+                rows=to_insert,
+                template=(
+                    "(%(sku)s, %(productName)s, %(categoryName)s,"
+                    " %(validFrom)s, NULL, TRUE)"
+                ),
+                fetch=True,
+            )
+            for sku, key in returned:
+                sku_to_key[sku] = key
 
         log.info("upsert_dim_product: %d SKUs processed", len(sku_to_key))
         return sku_to_key
@@ -236,7 +285,7 @@ class Loader:
     def upsert_dim_customer(
         self, customers_df: pd.DataFrame, conn: Connection
     ) -> dict[str, int]:
-        """SCD Type 2 upsert for dimCustomer.
+        """SCD Type 2 upsert for dimCustomer — batched.
 
         Returns
         -------
@@ -246,6 +295,22 @@ class Loader:
             return {}
 
         today = date.today()
+        cids = customers_df["customerId"].astype(str).tolist()
+
+        # 1. Fetch all current active rows in one query.
+        result = conn.execute(
+            text("""
+                SELECT "customerKey", "customerId", "fullName", email, "isActive"
+                FROM "dimCustomer"
+                WHERE "customerId" = ANY(:cids) AND "isActive" = TRUE
+            """),
+            {"cids": cids},
+        )
+        existing: dict[str, Any] = {str(row.customerId): row for row in result}
+
+        # 2. Classify in Python.
+        to_expire: list[int] = []
+        to_insert: list[dict] = []
         cid_to_key: dict[str, int] = {}
 
         for _, row in customers_df.iterrows():
@@ -254,71 +319,67 @@ class Loader:
             email = row.get("email")
             is_active = bool(row.get("isActive", True))
 
-            existing = conn.execute(
-                text("""
-                    SELECT "customerKey", "fullName", email, "isActive"
-                    FROM "dimCustomer"
-                    WHERE "customerId" = :cid AND "isActive" = TRUE
-                    LIMIT 1
-                    """),
-                {"cid": cid},
-            ).fetchone()
-
-            if existing is None:
-                result = conn.execute(
-                    text("""
-                        INSERT INTO "dimCustomer"
-                            ("customerId", "fullName", email,
-                             "validFrom", "validTo", "isActive")
-                        VALUES
-                            (:cid, :fullName, :email,
-                             :validFrom, NULL, TRUE)
-                        RETURNING "customerKey"
-                        """),
+            if cid not in existing:
+                to_insert.append(
                     {
                         "cid": cid,
                         "fullName": full_name,
                         "email": email,
                         "validFrom": today,
-                    },
+                        "isActive": is_active,
+                    }
                 )
-                cid_to_key[cid] = int(result.scalar_one())
             else:
-                changed = (
-                    existing.fullName != full_name
-                    or existing.email != email
-                    or existing.isActive != is_active
-                )
-                if changed:
-                    conn.execute(
-                        text("""
-                            UPDATE "dimCustomer"
-                            SET "validTo" = :today, "isActive" = FALSE
-                            WHERE "customerKey" = :pk
-                            """),
-                        {"today": today, "pk": existing.customerKey},
-                    )
-                    result = conn.execute(
-                        text("""
-                            INSERT INTO "dimCustomer"
-                                ("customerId", "fullName", email,
-                                 "validFrom", "validTo", "isActive")
-                            VALUES
-                                (:cid, :fullName, :email,
-                                 :validFrom, NULL, :isActive)
-                            RETURNING "customerKey"
-                            """),
+                ex = existing[cid]
+                if (
+                    ex.fullName != full_name
+                    or ex.email != email
+                    or ex.isActive != is_active
+                ):
+                    to_expire.append(ex.customerKey)
+                    to_insert.append(
                         {
                             "cid": cid,
                             "fullName": full_name,
                             "email": email,
                             "validFrom": today,
                             "isActive": is_active,
-                        },
+                        }
                     )
-                    cid_to_key[cid] = int(result.scalar_one())
                 else:
-                    cid_to_key[cid] = existing.customerKey
+                    cid_to_key[cid] = ex.customerKey
+
+        # 3. Expire changed rows in ONE UPDATE.
+        if to_expire:
+            conn.execute(
+                text("""
+                    UPDATE "dimCustomer"
+                    SET "validTo" = :today, "isActive" = FALSE
+                    WHERE "customerKey" = ANY(:keys)
+                """),
+                {"today": today, "keys": to_expire},
+            )
+
+        # 4. Bulk INSERT, get keys back via RETURNING.
+        if to_insert:
+            returned = _bulk_insert(
+                conn,
+                sql=(
+                    'INSERT INTO "dimCustomer" '
+                    '("customerId", "fullName", email,'
+                    ' "validFrom", "validTo", "isActive") '
+                    "VALUES %s "
+                    'RETURNING "customerId", "customerKey"'
+                ),
+                rows=to_insert,
+                template=(
+                    "(%(cid)s, %(fullName)s, %(email)s,"
+                    " %(validFrom)s, NULL, %(isActive)s)"
+                ),
+                fetch=True,
+            )
+            for cid, key in returned:
+                cid_to_key[str(cid)] = key
 
         log.info("upsert_dim_customer: %d customers processed", len(cid_to_key))
         return cid_to_key
@@ -334,7 +395,7 @@ class Loader:
         name_col: str,
         conn: Connection,
     ) -> dict[str, int]:
-        """INSERT … ON CONFLICT DO NOTHING upsert for fixed lookup dimensions.
+        """Bulk INSERT … ON CONFLICT DO NOTHING for fixed lookup dimensions.
 
         Covers dimStore, dimGeography, dimChannel, dimPaymentMethod,
         and dimOrderStatus.
@@ -350,7 +411,12 @@ class Loader:
         if config is None:
             raise ValueError(f"Unknown lookup table: {table!r}")
 
-        conn.execute(text(config["insert"]), df.to_dict(orient="records"))
+        _bulk_insert(
+            conn,
+            sql=config["insert"],
+            rows=df.to_dict(orient="records"),
+            template=config["template"],
+        )
 
         names = df[name_col].tolist()
         result = conn.execute(text(config["select"]), {"names": names})
@@ -370,23 +436,7 @@ class Loader:
         tracker: LineageTracker,
         run_id: str,
     ) -> int:
-        """Resolve FKs from key_maps and insert factSales rows.
-
-        Parameters
-        ----------
-        fact_df:
-            Cleansed sales DataFrame.
-        key_maps:
-            ``{"dates": {date: dateKey}, "products": {sku: productKey},
-               "customers": {cid: customerKey}, "stores": {sid: storeKey},
-               "geographies": {province: geographyKey},
-               "channels": {name: channelKey},
-               "payment_methods": {name: paymentMethodKey},
-               "order_statuses": {name: orderStatusKey}}``
-        conn:
-            Active SQLAlchemy connection (within a transaction).
-        tracker / run_id:
-            Lineage tracking.
+        """Resolve FKs from key_maps and bulk-insert factSales rows.
 
         Returns
         -------
@@ -443,22 +493,25 @@ class Loader:
             )
 
         if rows:
-            conn.execute(
-                text("""
-                    INSERT INTO "factSales"
-                        ("dateKey", "productKey", "customerKey", "storeKey",
-                         "geographyKey", "channelKey", "paymentMethodKey",
-                         "orderStatusKey", "sourceTransactionId",
-                         quantity, "unitPrice", "discountApplied",
-                         "grossAmount", "netAmount")
-                    VALUES
-                        (:dateKey, :productKey, :customerKey, :storeKey,
-                         :geographyKey, :channelKey, :paymentMethodKey,
-                         :orderStatusKey, :sourceTransactionId,
-                         :quantity, :unitPrice, :discountApplied,
-                         :grossAmount, :netAmount)
-                    """),
-                rows,
+            _bulk_insert(
+                conn,
+                sql=(
+                    'INSERT INTO "factSales" '
+                    '("dateKey", "productKey", "customerKey", "storeKey",'
+                    ' "geographyKey", "channelKey", "paymentMethodKey",'
+                    ' "orderStatusKey", "sourceTransactionId",'
+                    ' quantity, "unitPrice", "discountApplied",'
+                    ' "grossAmount", "netAmount") '
+                    "VALUES %s"
+                ),
+                rows=rows,
+                template=(
+                    "(%(dateKey)s, %(productKey)s, %(customerKey)s, %(storeKey)s,"
+                    " %(geographyKey)s, %(channelKey)s, %(paymentMethodKey)s,"
+                    " %(orderStatusKey)s, %(sourceTransactionId)s,"
+                    " %(quantity)s, %(unitPrice)s, %(discountApplied)s,"
+                    " %(grossAmount)s, %(netAmount)s)"
+                ),
             )
 
         tracker.record(
@@ -490,7 +543,7 @@ class Loader:
         tracker: LineageTracker,
         run_id: str,
     ) -> int:
-        """Resolve FKs and insert factFeedback rows.
+        """Resolve FKs and bulk-insert factFeedback rows.
 
         Returns
         -------
@@ -532,18 +585,21 @@ class Loader:
             )
 
         if rows:
-            conn.execute(
-                text("""
-                    INSERT INTO "factFeedback"
-                        ("dateKey", "customerKey", "productKey", "geographyKey",
-                         "sourceOrderId", "satisfactionScore", "npsScore",
-                         "productRating", "deliveryRating", "hasFreeText")
-                    VALUES
-                        (:dateKey, :customerKey, :productKey, :geographyKey,
-                         :sourceOrderId, :satisfactionScore, :npsScore,
-                         :productRating, :deliveryRating, :hasFreeText)
-                    """),
-                rows,
+            _bulk_insert(
+                conn,
+                sql=(
+                    'INSERT INTO "factFeedback" '
+                    '("dateKey", "customerKey", "productKey", "geographyKey",'
+                    ' "sourceOrderId", "satisfactionScore", "npsScore",'
+                    ' "productRating", "deliveryRating", "hasFreeText") '
+                    "VALUES %s"
+                ),
+                rows=rows,
+                template=(
+                    "(%(dateKey)s, %(customerKey)s, %(productKey)s, %(geographyKey)s,"
+                    " %(sourceOrderId)s, %(satisfactionScore)s, %(npsScore)s,"
+                    " %(productRating)s, %(deliveryRating)s, %(hasFreeText)s)"
+                ),
             )
 
         tracker.record(
@@ -575,7 +631,7 @@ class Loader:
         tracker: LineageTracker,
         run_id: str,
     ) -> int:
-        """Resolve FKs and insert factInventorySnapshot rows.
+        """Resolve FKs and bulk-insert factInventorySnapshot rows.
 
         Returns
         -------
@@ -613,16 +669,20 @@ class Loader:
             )
 
         if rows:
-            conn.execute(
-                text("""
-                    INSERT INTO "factInventorySnapshot"
-                        ("dateKey", "productKey", "locationLabel", "stockQuantity",
-                         "reorderThreshold", "daysSinceRestock", "isBelowReorder")
-                    VALUES
-                        (:dateKey, :productKey, :locationLabel, :stockQuantity,
-                         :reorderThreshold, :daysSinceRestock, :isBelowReorder)
-                    """),
-                rows,
+            _bulk_insert(
+                conn,
+                sql=(
+                    'INSERT INTO "factInventorySnapshot" '
+                    '("dateKey", "productKey", "locationLabel", "stockQuantity",'
+                    ' "reorderThreshold", "daysSinceRestock", "isBelowReorder") '
+                    "VALUES %s"
+                ),
+                rows=rows,
+                template=(
+                    "(%(dateKey)s, %(productKey)s, %(locationLabel)s,"
+                    " %(stockQuantity)s, %(reorderThreshold)s,"
+                    " %(daysSinceRestock)s, %(isBelowReorder)s)"
+                ),
             )
 
         tracker.record(
