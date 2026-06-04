@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
       await forgotPassword(email);
       setStep("sent");
     } catch {
-      setServerError("Something went wrong. Please try again.");
+      setServerError("Something went wrong. Please try again.2");
     } finally {
       setLoading(false);
     }

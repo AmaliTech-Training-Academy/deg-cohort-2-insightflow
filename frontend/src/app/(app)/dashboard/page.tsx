@@ -12,6 +12,8 @@ export default function DashboardPage() {
     queryKey: ["dashboard-stats"],
     queryFn: getDashboardStats,
     refetchInterval: 30_000,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   if (isLoading) {
@@ -23,7 +25,7 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-lg border border-gray-200 bg-white shadow-sm p-5 h-28 animate-pulse bg-gray-100" />
+            <div key={i} className="rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-700 shadow-sm p-5 h-28 animate-pulse" />
           ))}
         </div>
         <LoadingSkeleton rows={5} />

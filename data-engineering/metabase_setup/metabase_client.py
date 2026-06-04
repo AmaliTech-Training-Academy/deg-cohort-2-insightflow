@@ -138,6 +138,23 @@ def clean_up(session_id):
 
 
 # ----------------------------
+# Find existing dashboard by name
+# ----------------------------
+def get_existing_dashboard_id(session_id, name="InsightFlow Analytics"):
+    """Return the ID of the first dashboard matching *name*, or None."""
+    headers = {"X-Metabase-Session": session_id}
+    r = _session.get(f"{METABASE_URL}/api/dashboard", headers=headers, timeout=10)
+    r.raise_for_status()
+    resp = r.json()
+    items = resp.get("data", resp) if isinstance(resp, dict) else resp
+    for item in items or []:
+        if item.get("name") == name:
+            logger.info(f"Found existing dashboard '{name}' with ID: {item['id']}")
+            return item["id"]
+    return None
+
+
+# ----------------------------
 # Build tabbed dashboard
 # ----------------------------
 def build_tabbed_dashboard(

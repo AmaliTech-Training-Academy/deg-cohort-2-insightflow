@@ -75,6 +75,7 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
   const raw = await apiFetch<LoginBackendResponse>("/auth/login/", {
     method: "POST",
     body: JSON.stringify(payload),
+    skipAuth: true,
   });
 
   // Handle both response shapes:
@@ -105,6 +106,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
       first_name: firstName,
       last_name: lastName,
     }),
+    skipAuth: true,
   });
 
   // Backend register returns no tokens — auto-login to get them

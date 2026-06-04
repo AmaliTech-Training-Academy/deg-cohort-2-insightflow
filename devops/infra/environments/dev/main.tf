@@ -65,28 +65,31 @@ module "s3" {
 
 # ── Network ───────────────────────────────────────────────────────────────────
 module "vpc" {
-  source         = "../../modules/vpc"
-  name           = local.name
-  region         = var.region
-  vpc_cidr       = "10.1.0.0/16"
-  public_cidr_a  = "10.1.1.0/24"
-  public_cidr_b  = "10.1.2.0/24"
-  private_cidr_a = "10.1.10.0/24"
-  private_cidr_b = "10.1.11.0/24"
-  tags           = local.common_tags
+  source             = "../../modules/vpc"
+  name               = local.name
+  region             = var.region
+  vpc_cidr           = "10.1.0.0/16"
+  public_cidr_a      = "10.1.1.0/24"
+  public_cidr_b      = "10.1.2.0/24"
+  private_cidr_a     = "10.1.10.0/24"
+  private_cidr_b     = "10.1.11.0/24"
+  enable_nat_gateway = false # EC2 is in a public subnet; RDS/Redis only accept inbound
+  tags               = local.common_tags
 }
 
 # ── Security groups ───────────────────────────────────────────────────────────
 # Dev: ALB routes HTTP traffic; SSH open for debugging.
 module "security_groups" {
-  source                 = "../../modules/security-groups"
-  name                   = local.name
-  vpc_id                 = module.vpc.vpc_id
-  enable_alb             = true
-  enable_ssh             = true          # dev only — never enable in prod
-  ssh_cidr_blocks        = ["0.0.0.0/0"] # restrict to your IP for extra safety
-  allow_public_db_access = true          # dev only — direct DB access without tunnel
-  tags                   = local.common_tags
+  source                    = "../../modules/security-groups"
+  name                      = local.name
+  vpc_id                    = module.vpc.vpc_id
+  enable_alb                = true
+  enable_ssh                = true          # dev only — never enable in prod
+  ssh_cidr_blocks           = ["0.0.0.0/0"] # restrict to your IP for extra safety
+  allow_public_db_access    = true          # dev only — direct DB access without tunnel
+  allow_public_redis_access = true          # dev only — troubleshooting; ElastiCache has no public IP, use SSH tunnel
+  allow_redis_proxy         = true          # dev only — EC2 socat proxy on port 6380 → Redis:6379
+  tags                      = local.common_tags
 }
 
 # ── EC2 ───────────────────────────────────────────────────────────────────────
@@ -98,8 +101,8 @@ module "ec2" {
   region             = var.region
   subnet_id          = module.vpc.public_subnet_a_id
   security_group_id  = module.security_groups.ec2_sg_id
-  instance_type      = "t3.small"
-  root_volume_gb     = 30
+  instance_type      = "t3.2xlarge"
+  root_volume_gb     = 50
   enable_public_ip   = true
   key_name           = aws_key_pair.dev.key_name
   s3_bucket_name     = module.s3.bucket_name

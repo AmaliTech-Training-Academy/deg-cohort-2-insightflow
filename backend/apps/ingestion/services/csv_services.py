@@ -71,6 +71,7 @@ class POSIngestionService:
         job: InjectionJob = InjectionJob.objects.create(
             status=InjectionJob.StatusChoices.PENDING,
             total_rows=total_rows,
+            rejected_rows=0,
         )
 
         job.file = file

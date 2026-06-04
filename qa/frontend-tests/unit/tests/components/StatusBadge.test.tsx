@@ -3,13 +3,13 @@ import { describe, it, expect } from "vitest";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
 const STATUSES = [
-  { status: "pending",    text: "Pending",    cls: "bg-yellow-100" },
-  { status: "processing", text: "Processing", cls: "bg-blue-100" },
-  { status: "completed",  text: "Completed",  cls: "bg-green-100" },
-  { status: "failed",     text: "Failed",     cls: "bg-red-100" },
-  { status: "healthy",    text: "Healthy",    cls: "bg-green-100" },
-  { status: "degraded",   text: "Degraded",   cls: "bg-yellow-100" },
-  { status: "down",       text: "Down",       cls: "bg-red-100" },
+  { status: "pending",    text: "Pending",    cls: "bg-yellow-50" },
+  { status: "processing", text: "Processing", cls: "bg-blue-50" },
+  { status: "completed",  text: "Completed",  cls: "bg-green-50" },
+  { status: "failed",     text: "Failed",     cls: "bg-red-50" },
+  { status: "healthy",    text: "Healthy",    cls: "bg-green-50" },
+  { status: "degraded",   text: "Degraded",   cls: "bg-yellow-50" },
+  { status: "down",       text: "Down",       cls: "bg-red-50" },
 ] as const;
 
 describe("StatusBadge", () => {

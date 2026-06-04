@@ -33,6 +33,12 @@ variable "private_cidr_b" {
   type        = string
 }
 
+variable "enable_nat_gateway" {
+  description = "Create a NAT Gateway (and its EIP) for private-subnet outbound internet. Set false in dev where no private resource needs outbound access."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

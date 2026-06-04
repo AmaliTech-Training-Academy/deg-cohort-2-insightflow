@@ -48,7 +48,7 @@ from etl.alerts import AlertManager, AnomalyAlert
 from etl.extract import Extractor
 from etl.lineage import LineageStage, LineageTracker  # noqa: F401
 from etl.load import Loader
-from etl.notify import send_pipeline_report
+from etl.notify import send_critical_alert, send_pipeline_report
 from etl.quality import AnomalyDetector, DataQualityChecker, SourceQualityReport
 from etl.state import get_watermark_date
 from etl.transform import Transformer
@@ -230,7 +230,14 @@ def run_pipeline(since: date | None = None) -> None:
         )
         quality_reports.append(pos_report)
         if alert_mgr_pos.to_dict():
-            alert_mgr_pos.flush(pos_report.to_dict())
+            if alert_mgr_pos.flush(pos_report.to_dict()):
+                send_critical_alert(
+                    table="posTransactions",
+                    score=pos_report.overall_score,
+                    threshold=0.95,
+                    total_rows=pos_report.total_rows,
+                    failed_rows=pos_report.failed_rows,
+                )
 
     if not online_df.empty:
         alert_mgr_online = AlertManager()
@@ -239,7 +246,14 @@ def run_pipeline(since: date | None = None) -> None:
         )
         quality_reports.append(online_report)
         if alert_mgr_online.to_dict():
-            alert_mgr_online.flush(online_report.to_dict())
+            if alert_mgr_online.flush(online_report.to_dict()):
+                send_critical_alert(
+                    table="onlineOrders",
+                    score=online_report.overall_score,
+                    threshold=0.95,
+                    total_rows=online_report.total_rows,
+                    failed_rows=online_report.failed_rows,
+                )
 
     if not feedback_df.empty:
         alert_mgr_fb = AlertManager()
@@ -248,7 +262,14 @@ def run_pipeline(since: date | None = None) -> None:
         )
         quality_reports.append(fb_report)
         if alert_mgr_fb.to_dict():
-            alert_mgr_fb.flush(fb_report.to_dict())
+            if alert_mgr_fb.flush(fb_report.to_dict()):
+                send_critical_alert(
+                    table="feedback",
+                    score=fb_report.overall_score,
+                    threshold=0.90,
+                    total_rows=fb_report.total_rows,
+                    failed_rows=fb_report.failed_rows,
+                )
 
     if not inventory_df.empty:
         alert_mgr_inv = AlertManager()
@@ -257,7 +278,14 @@ def run_pipeline(since: date | None = None) -> None:
         )
         quality_reports.append(inv_report)
         if alert_mgr_inv.to_dict():
-            alert_mgr_inv.flush(inv_report.to_dict())
+            if alert_mgr_inv.flush(inv_report.to_dict()):
+                send_critical_alert(
+                    table="inventory",
+                    score=inv_report.overall_score,
+                    threshold=0.98,
+                    total_rows=inv_report.total_rows,
+                    failed_rows=inv_report.failed_rows,
+                )
 
     # ------------------------------------------------------------------
     # 4. Transform

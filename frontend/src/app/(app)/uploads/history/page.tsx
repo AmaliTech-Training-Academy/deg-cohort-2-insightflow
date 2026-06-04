@@ -94,11 +94,16 @@ export default function UploadHistoryPage() {
                 {data.results.map((job: IngestionJob) => (
                   <tr
                     key={job.id}
-                    className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                    className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
                   >
-                    <td className="px-5 py-3.5 max-w-[200px]">
+                    <td className="px-5 py-3.5 max-w-[220px]">
                       <p className="font-medium text-gray-900 dark:text-slate-100 truncate">{job.fileName}</p>
                       <p className="text-xs text-gray-400 dark:text-slate-500 truncate mt-0.5">{job.id}</p>
+                      {job.status === "failed" && job.errorMessage && (
+                        <p className="text-xs text-red-500 dark:text-red-400 truncate mt-0.5" title={job.errorMessage}>
+                          {job.errorMessage}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 whitespace-nowrap">
                       {SOURCE_LABELS[job.sourceType] ?? job.sourceType}
@@ -135,28 +140,21 @@ export default function UploadHistoryPage() {
 
 function RecordsCell({ job }: { job: IngestionJob }) {
   if (job.status === "pending" || job.status === "processing") {
-    return <span className="text-gray-400">—</span>;
+    return <span className="text-gray-300 dark:text-slate-600">—</span>;
   }
   if (job.status === "failed") {
-    return (
-      <span
-        className="text-red-600 text-xs truncate max-w-[160px] block"
-        title={job.errorMessage ?? ""}
-      >
-        {job.errorMessage ?? "Failed"}
-      </span>
-    );
+    return <span className="text-gray-300 dark:text-slate-600">—</span>;
   }
   if (job.recordsProcessed != null && job.recordsTotal != null) {
     const allOk = job.recordsProcessed === job.recordsTotal;
     return (
-      <span className={allOk ? "text-green-700" : "text-yellow-700"}>
+      <span className={allOk ? "text-green-700 dark:text-green-400" : "text-yellow-700 dark:text-yellow-400"}>
         {job.recordsProcessed.toLocaleString()}
         {!allOk && (
-          <span className="text-gray-400"> / {job.recordsTotal.toLocaleString()}</span>
+          <span className="text-gray-400 dark:text-slate-500"> / {job.recordsTotal.toLocaleString()}</span>
         )}
       </span>
     );
   }
-  return <span className="text-gray-400">—</span>;
+  return <span className="text-gray-300 dark:text-slate-600">—</span>;
 }
