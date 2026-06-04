@@ -18,4 +18,3 @@ variable "cors_allowed_origins" {
   type        = string
   default     = ""
 }
-
