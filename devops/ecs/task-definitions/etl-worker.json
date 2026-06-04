@@ -1,0 +1,34 @@
+{
+  "family": "insightflow-prod-etl-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/insightflow-prod-ecs-execution",
+  "taskRoleArn":      "arn:aws:iam::ACCOUNT_ID:role/insightflow-prod-ecs-task",
+  "containerDefinitions": [
+    {
+      "name": "etl-worker",
+      "image": "PLACEHOLDER",
+      "essential": true,
+      "environment": [
+        { "name": "DB_PORT", "value": "5432" }
+      ],
+      "secrets": [
+        { "name": "DB_HOST",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:host::" },
+        { "name": "DB_NAME",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:dbname::" },
+        { "name": "DB_USER",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:username::" },
+        { "name": "DB_PASSWORD",      "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:password::" },
+        { "name": "REDIS_URL",        "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/redis/endpoint:url::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/insightflow/prod/etl-worker",
+          "awslogs-region":        "AWS_REGION",
+          "awslogs-stream-prefix": "etl-worker"
+        }
+      }
+    }
+  ]
+}
