@@ -8,7 +8,7 @@ class InjectionJobSerializer(serializers.ModelSerializer):
 
     def get_file_name(self, obj: InjectionJob) -> str:
         if obj.file and obj.file.name:
-            return obj.file.name.split("/")[-1]
+            return str(obj.file.name).split("/")[-1]
         return f"job-{obj.id}"
 
     class Meta:

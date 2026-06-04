@@ -15,7 +15,7 @@ from .views.pos import POSStagingListCreateView
 
 urlpatterns = [
     path("pos/", POSStagingListCreateView.as_view(), name="pos-list-create"),
-    path("pos/jobs/", InjectionJobListView.as_view(), name="pos-job-list"),
+    path("pos/jobs/", IngestionJobListView.as_view(), name="pos-job-list"),
     path("feedback/trigger/", FeedbackIngestView.as_view(), name="feedback-trigger"),
     path("feedback/jobs/", FeedbackJobListView.as_view(), name="feedback-job-list"),
     path(

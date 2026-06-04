@@ -64,9 +64,11 @@ export default function RegisterPage() {
       setStoredUser(res.user);
       router.replace("/dashboard");
     } catch (err) {
+      console.error("Register error:", err);
       setServerError(
         err instanceof ApiError ? err.detail : "Something went wrong. Please try again."
       );
+
     } finally {
       setLoading(false);
     }

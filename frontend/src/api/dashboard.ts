@@ -2,35 +2,64 @@ import { apiFetch } from "./client";
 import type { DashboardStats } from "@/types";
 import type { OnlineOrdersJob } from "./onlineOrders";
 
-interface OnlineOrdersJobsPage {
+interface PosJobResponse {
+  id: number;
+  file_name: string;
+  status: string;
+  total_rows: number | null;
+  valid_rows: number;
+  rejected_rows: number;
+  error_rows: number;
+  error_report: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Page<T> {
   count: number;
-  results: OnlineOrdersJob[];
+  results: T[];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const jobs = await apiFetch<OnlineOrdersJobsPage>(
-    "/ingestion/online-orders/jobs/?page=1"
-  );
+  const [posData, ooData] = await Promise.all([
+    apiFetch<Page<PosJobResponse>>("/ingestion/pos/jobs/?page=1"),
+    apiFetch<Page<OnlineOrdersJob>>("/ingestion/online-orders/jobs/?page=1"),
+  ]);
 
   const todayStr = new Date().toDateString();
-  const todayJobs = jobs.results.filter(
+
+  const posToday = posData.results.filter(
+    (j) => new Date(j.created_at).toDateString() === todayStr
+  );
+  const ooToday = ooData.results.filter(
     (j) => new Date(j.created_at).toDateString() === todayStr
   );
 
-  const jobsToday = todayJobs.length;
-  const jobsSuccessToday = todayJobs.filter((j) => j.status === "completed").length;
-  const jobsFailedToday = todayJobs.filter((j) => j.status === "failed").length;
-  const recordsIngested = jobs.results
-    .filter((j) => j.status === "completed")
-    .reduce((sum, j) => sum + (j.valid_orders ?? 0), 0);
+  const jobsToday = posToday.length + ooToday.length;
+  const jobsSuccessToday =
+    posToday.filter((j) => j.status === "completed").length +
+    ooToday.filter((j) => j.status === "completed").length;
+  const jobsFailedToday =
+    posToday.filter((j) => j.status === "failed").length +
+    ooToday.filter((j) => j.status === "failed").length;
 
-  // Derive online orders source health from most recent job
-  const latest = jobs.results[0];
-  const onlineStatus =
-    !latest ? "degraded"
-    : latest.status === "completed" ? "healthy"
-    : latest.status === "failed" ? "down"
-    : "degraded";
+  const recordsIngested =
+    posData.results
+      .filter((j) => j.status === "completed")
+      .reduce((sum, j) => sum + j.valid_rows, 0) +
+    ooData.results
+      .filter((j) => j.status === "completed")
+      .reduce((sum, j) => sum + (j.valid_orders ?? 0), 0);
+
+  const latestPos = posData.results[0];
+  const latestOo = ooData.results[0];
+
+  function jobStatus(job: { status: string } | undefined): "healthy" | "degraded" | "down" {
+    if (!job) return "degraded";
+    if (job.status === "completed") return "healthy";
+    if (job.status === "failed") return "down";
+    return "degraded";
+  }
 
   return {
     jobsToday,
@@ -42,15 +71,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         id: "1",
         name: "POS System",
         type: "pos",
-        lastSyncAt: null,
-        status: "degraded",
+        lastSyncAt: latestPos?.updated_at ?? null,
+        status: jobStatus(latestPos),
       },
       {
         id: "2",
         name: "Online Orders",
         type: "online_orders",
-        lastSyncAt: latest?.updated_at ?? null,
-        status: onlineStatus,
+        lastSyncAt: latestOo?.updated_at ?? null,
+        status: jobStatus(latestOo),
       },
       {
         id: "3",
