@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { register } from "@/api/auth";
-import { setToken } from "@/lib/tokenStorage";
+import { ApiError } from "@/api/client";
+import { setToken, setStoredUser } from "@/lib/tokenStorage";
 
 interface FormErrors {
   name?: string;
   email?: string;
   password?: string;
-  confirmPassword?: string;
 }
 
 function validatePassword(pwd: string): boolean {
@@ -34,9 +34,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,7 +45,6 @@ export default function RegisterPage() {
     if (!trimmedName || trimmedName.split(/\s+/).length < 2) e.name = "Enter your full name.";
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid email address.";
     if (!validatePassword(password)) e.password = "Password is too weak (8+ chars, mix it up).";
-    if (!confirmPassword || confirmPassword !== password) e.confirmPassword = "Passwords don't match.";
     return e;
   }
 
@@ -61,9 +58,10 @@ export default function RegisterPage() {
     try {
       const res = await register({ name, email, password });
       setToken(res.access);
+      setStoredUser(res.user);
       router.replace("/dashboard");
-    } catch {
-      setServerError("Something went wrong. Please try again.");
+    } catch (err) {
+      setServerError(err instanceof ApiError ? err.detail : "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -166,30 +164,6 @@ export default function RegisterPage() {
                 ? <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.password}</p>
                 : <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">Use 8+ chars with mixed case, a number or symbol.</p>
               }
-            </div>
-
-            {/* Confirm password */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                Confirm password
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
-                  <LockIcon />
-                </span>
-                <input
-                  id="confirmPassword" type={showConfirm ? "text" : "password"} autoComplete="new-password"
-                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
-                  className={`${inputBase} pl-9 pr-10 ${errors.confirmPassword ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-slate-600"}`}
-                />
-                <button type="button" onClick={() => setShowConfirm((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-                  aria-label={showConfirm ? "Hide password" : "Show password"}>
-                  {showConfirm ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              {errors.confirmPassword && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
             </div>
 
             <button

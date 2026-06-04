@@ -38,7 +38,7 @@ export function FileDropzone({
       onDrop={handleDrop}
       onClick={() => !disabled && inputRef.current?.click()}
       onKeyDown={(e) => e.key === "Enter" && !disabled && inputRef.current?.click()}
-      className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-sm transition-all select-none ${
+      className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 sm:p-10 text-sm transition-all select-none ${
         disabled
           ? "opacity-50 cursor-not-allowed border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50"
           : dragging
