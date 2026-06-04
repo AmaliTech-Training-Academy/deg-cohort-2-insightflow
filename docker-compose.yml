@@ -165,6 +165,32 @@ services:
              --queues=etl
              --concurrency=1
 
+  metabase:
+    image: metabase/metabase:latest
+    container_name: insightflow-metabase
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  metabase-setup:
+    image: insightflow-etl:${DEPLOY_TAG:-local}
+    build:
+      context: ./data-engineering
+      dockerfile: Dockerfile
+    container_name: insightflow-metabase-setup
+    env_file: .env
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+      metabase:
+        condition: service_started
+    restart: "no"
+    command: >
+      sh -c "cd data-engineering/metabase_setup && python metabase_setup.py"
+
 volumes:
   redis-data:
   media-data:
