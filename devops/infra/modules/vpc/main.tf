@@ -48,15 +48,19 @@ resource "aws_subnet" "private_b" {
   tags              = merge(var.tags, { Name = "${var.name}-private-b" })
 }
 
-# Single NAT GW in public-a — cost-optimised; private-b also routes through it
+# NAT GW + EIP — only provisioned when var.enable_nat_gateway is true (prod).
+# Dev EC2 sits in a public subnet and uses the IGW directly; RDS/Redis only
+# accept inbound connections, so no private resource needs outbound internet.
 resource "aws_eip" "nat" {
+  count      = var.enable_nat_gateway ? 1 : 0
   domain     = "vpc"
   depends_on = [aws_internet_gateway.this]
   tags       = merge(var.tags, { Name = "${var.name}-nat-eip" })
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public_a.id
   tags          = merge(var.tags, { Name = "${var.name}-nat" })
   depends_on    = [aws_internet_gateway.this]
@@ -73,11 +77,14 @@ resource "aws_route_table" "public" {
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this.id
-  }
-  tags = merge(var.tags, { Name = "${var.name}-private-rt" })
+  tags   = merge(var.tags, { Name = "${var.name}-private-rt" })
+}
+
+resource "aws_route" "private_nat" {
+  count                  = var.enable_nat_gateway ? 1 : 0
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.this[0].id
 }
 
 resource "aws_route_table_association" "public_a" {
