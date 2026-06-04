@@ -77,7 +77,7 @@ _LOOKUP_SQL: dict[str, dict[str, str]] = {
             "VALUES %s "
             'ON CONFLICT ("statusName") DO NOTHING'
         ),
-        "template": "(%(statusName)s,)",
+        "template": "(%(statusName)s)",
         "select": (
             'SELECT "statusName", "orderStatusKey" FROM "dimOrderStatus" '
             'WHERE "statusName" = ANY(:names)'
