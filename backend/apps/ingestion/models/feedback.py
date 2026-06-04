@@ -1,19 +1,26 @@
+from apps.ingestion.models.base import Customer
+from apps.ingestion.models.online_orders import OnlineOrder
 from django.db import models
 
-from .base import AbstractStagingRecord
 
-
-class FeedbackStagingRecord(AbstractStagingRecord):
-    feedback_id = models.CharField(max_length=100, blank=True, null=True)
-    customer_id = models.CharField(max_length=50, blank=True, null=True)
-    rating = models.PositiveSmallIntegerField(null=True, blank=True)
-    comment = models.TextField(blank=True, null=True)
-    feedback_date = models.DateField(null=True, blank=True)
-    raw_data = models.JSONField(default=dict, blank=True)
+class FeedbackSurvey(models.Model):
+    responseId = models.IntegerField(primary_key=True, db_column="responseId")
+    customerId = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, db_column="customerId"
+    )
+    onlineOrderId = models.ForeignKey(
+        OnlineOrder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="onlineOrderId",
+    )
+    submissionDate = models.DateField(db_column="submissionDate")
+    satisfactionScore = models.PositiveSmallIntegerField(db_column="satisfactionScore")
+    npsScore = models.PositiveSmallIntegerField(db_column="npsScore")
+    productRating = models.PositiveSmallIntegerField(db_column="productRating")
+    deliveryRating = models.PositiveSmallIntegerField(db_column="deliveryRating")
+    freeTextComments = models.TextField(db_column="freeTextComments")
 
     class Meta:
-        db_table = "ingestion_feedback_staging"
-        ordering = ["-ingested_at"]
-
-    def __str__(self):
-        return f"Feedback {self.feedback_id or self.pk}"
+        db_table = "feedbackSurvey"

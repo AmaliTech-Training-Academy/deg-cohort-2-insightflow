@@ -1,57 +1,33 @@
-from apps.ingestion.views.feedback import (
-    FeedbackStagingDetailView,
-    FeedbackStagingListCreateView,
-)
-from apps.ingestion.views.ingestion_job import (
-    IngestionJobDetailView,
-    IngestionJobListCreateView,
-)
-from apps.ingestion.views.inventory import (
-    InventoryStagingDetailView,
-    InventoryStagingListCreateView,
-)
-from apps.ingestion.views.online_orders import (
-    OnlineOrderStagingDetailView,
-    OnlineOrderStagingListCreateView,
-)
-from apps.ingestion.views.pos import POSStagingDetailView, POSStagingListCreateView
 from django.urls import path
 
+from .views.ingestion_job import IngestionJobStatusView
+from .views.online_orders import (
+    OnlineOrdersJobListView,
+    OnlineOrdersJobStatusView,
+    OnlineOrdersTriggerView,
+)
+from .views.pos import POSStagingListCreateView
+
 urlpatterns = [
-    path("jobs/", IngestionJobListCreateView.as_view(), name="ingestion-job-list"),
+    path("pos/", POSStagingListCreateView.as_view(), name="pos-list-create"),
     path(
-        "jobs/<int:pk>/", IngestionJobDetailView.as_view(), name="ingestion-job-detail"
-    ),
-    path("pos/", POSStagingListCreateView.as_view(), name="ingestion-pos-list"),
-    path("pos/<int:pk>/", POSStagingDetailView.as_view(), name="ingestion-pos-detail"),
-    path(
-        "online-orders/",
-        OnlineOrderStagingListCreateView.as_view(),
-        name="ingestion-online-orders-list",
+        "<int:job_id>/status/",
+        IngestionJobStatusView.as_view(),
+        name="ingestion-job-status",
     ),
     path(
-        "online-orders/<int:pk>/",
-        OnlineOrderStagingDetailView.as_view(),
-        name="ingestion-online-orders-detail",
+        "online-orders/trigger/",
+        OnlineOrdersTriggerView.as_view(),
+        name="online-orders-trigger",
     ),
     path(
-        "feedback/",
-        FeedbackStagingListCreateView.as_view(),
-        name="ingestion-feedback-list",
+        "online-orders/jobs/",
+        OnlineOrdersJobListView.as_view(),
+        name="online-orders-job-list",
     ),
     path(
-        "feedback/<int:pk>/",
-        FeedbackStagingDetailView.as_view(),
-        name="ingestion-feedback-detail",
-    ),
-    path(
-        "inventory/",
-        InventoryStagingListCreateView.as_view(),
-        name="ingestion-inventory-list",
-    ),
-    path(
-        "inventory/<int:pk>/",
-        InventoryStagingDetailView.as_view(),
-        name="ingestion-inventory-detail",
+        "online-orders/<int:job_id>/status/",
+        OnlineOrdersJobStatusView.as_view(),
+        name="online-orders-job-status",
     ),
 ]

@@ -1,9 +1,21 @@
-from apps.ingestion.models.online_orders import OnlineOrderStagingRecord
 from rest_framework import serializers
 
+from ..models.online_injection_job import OnlineInjectionJob
 
-class OnlineOrderStagingRecordSerializer(serializers.ModelSerializer):
+
+class OnlineInjectionJobSerializer(serializers.ModelSerializer):
     class Meta:
-        model = OnlineOrderStagingRecord
-        fields = "__all__"
-        read_only_fields = ("ingested_at",)
+        model = OnlineInjectionJob
+        fields = [
+            "id",
+            "status",
+            "trigger",
+            "total_orders",
+            "valid_orders",
+            "error_orders",
+            "pages_fetched",
+            "error_report",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]

@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -12,7 +13,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
-AUTH_USER_MODEL = "authentication.User"
+AUTH_USER_MODEL = "apps.authentication.User"
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -70,6 +71,9 @@ DATABASES = {
         "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": os.environ.get("DB_SSLMODE", "prefer"),
+        },
     }
 }
 
@@ -91,6 +95,9 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -106,7 +113,42 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardResultsPagination",
     "PAGE_SIZE": 20,
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "login": "20/hour",
+        "refresh_token": "100/hour",  # nosec B105
+        "pos_upload": "5000/hour",
+    },
 }
+
+# ── Celery ────────────────────────────────────────────────────────────────────
+_REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = _REDIS_URL
+CELERY_RESULT_BACKEND = _REDIS_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_EXPIRES = 3600  # task results expire after 1 hour — prevent Redis OOM
+CELERY_RESULT_EXPIRES = 3600
+
+ONLINE_ORDERS_API_URL = os.environ.get("ONLINE_ORDERS_API_URL", "")
+CELERY_BEAT_SCHEDULE = {
+    "fetch-online-orders-every-2-hours": {
+        "task": "apps.ingestion.tasks.fetch_online_orders.schedule_online_orders_fetch",
+        "schedule": crontab(minute=0, hour="*/2"),
+    },
+}
+
+if _REDIS_URL.startswith("rediss://"):
+    _SSL_OPTS = {"ssl_cert_reqs": "CERT_NONE"}
+    CELERY_BROKER_TRANSPORT_OPTIONS = _SSL_OPTS
+    CELERY_REDIS_BACKEND_USE_SSL = _SSL_OPTS
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
@@ -120,9 +162,47 @@ SIMPLE_JWT = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "apps.core.logging.JSONFormatter",
+        },
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "apps": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "InsightFlow API",
     "DESCRIPTION": "Multi-source Business Intelligence pipeline for retail analytics",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+AUTH_USER_MODEL = "authentication.User"

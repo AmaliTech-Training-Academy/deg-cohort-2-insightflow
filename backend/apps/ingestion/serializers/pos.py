@@ -1,9 +1,28 @@
-from apps.ingestion.models.pos import POSStagingRecord
 from rest_framework import serializers
 
+from ..models.pos import PosTransaction, PosTransactionLine
 
-class POSStagingRecordSerializer(serializers.ModelSerializer):
+
+class PosTransactionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = POSStagingRecord
-        fields = "__all__"
-        read_only_fields = ("ingested_at",)
+        model = PosTransaction
+        fields = [
+            "posTransactionId",
+            "storeId",
+            "cashierId",
+            "transactionDatetime",
+        ]
+
+
+class PosTransactionLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PosTransactionLine
+        fields = [
+            "lineId",
+            "posTransactionId",
+            "productSKU",
+            "quantity",
+            "unitPrice",
+            "discountApplied",
+            "totalAmount",
+        ]

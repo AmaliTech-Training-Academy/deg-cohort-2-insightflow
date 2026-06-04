@@ -18,7 +18,16 @@ python_version = "3.11"
 ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
-exclude = ["migrations/", "\\.venv/", "venv/"]
+explicit_package_bases = true
+exclude = [
+    "migrations/",
+    "\\.venv/",
+    "venv/",
+    "data_eng/",
+    "qa/data-engineering/conftest\\.py",
+    "qa/api-tests/conftest\\.py",
+    "data-engineering/metabase_setup/",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests", "qa"]

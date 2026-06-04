@@ -98,6 +98,18 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.ec2.id]
   }
 
+  # Direct internet access — dev only; never enable in prod
+  dynamic "ingress" {
+    for_each = var.allow_public_db_access ? [1] : []
+    content {
+      description = "PostgreSQL public access - dev only"
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = var.db_public_cidr_blocks
+    }
+  }
+
   egress {
     description = "All outbound traffic"
     from_port   = 0

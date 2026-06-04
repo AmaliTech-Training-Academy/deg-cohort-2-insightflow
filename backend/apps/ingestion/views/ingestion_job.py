@@ -1,16 +1,62 @@
-from apps.ingestion.models.base import IngestionJob
-from apps.ingestion.serializers.ingestion_job import IngestionJobSerializer
-from rest_framework import generics
+import logging
+from datetime import timedelta
+
+from celery.result import AsyncResult
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from ..models.base import InjectionJob
+
+STALE_THRESHOLD = timedelta(minutes=10)
+
+logger = logging.getLogger(__name__)
 
 
-class IngestionJobListCreateView(generics.ListCreateAPIView):
-    queryset = IngestionJob.objects.select_related("created_by").all()
-    serializer_class = IngestionJobSerializer
+class IngestionJobStatusView(APIView):
+    """
+    GET /api/ingestion/<job_id>/status/
+
+    Returns current state of an ingestion job.
+    Client polls this after receiving 202 from the upload endpoint.
+    404 if job_id does not exist.
+    """
+
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, job_id):
+        job = get_object_or_404(InjectionJob, id=job_id)
 
-class IngestionJobDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = IngestionJob.objects.select_related("created_by").all()
-    serializer_class = IngestionJobSerializer
-    permission_classes = [IsAuthenticated]
+        # Detect worker crashes: RUNNING job whose task is dead or stale
+        if job.status == InjectionJob.StatusChoices.RUNNING:
+            task_dead = False
+            if job.task_id:
+                result = AsyncResult(job.task_id)
+                task_dead = result.state in ("FAILURE", "REVOKED")
+            stale = timezone.now() - job.updated_at > STALE_THRESHOLD
+            if task_dead or stale:
+                job.status = InjectionJob.StatusChoices.FAILED
+                job.error_report = {"fatal_error": "Worker stopped unexpectedly"}
+                job.save(update_fields=["status", "error_report"])
+
+        response = {
+            "job_id": job.id,
+            "status": job.status,
+            "total_rows": job.total_rows,
+            "valid_rows": job.valid_rows,
+            "error_rows": job.error_rows,
+            "created_at": job.created_at,
+            "updated_at": job.updated_at,
+        }
+
+        # attach error report only when job is done
+        if job.status in [
+            InjectionJob.StatusChoices.COMPLETED,
+            InjectionJob.StatusChoices.FAILED,
+        ]:
+            if job.error_report:
+                response["error_report"] = job.error_report
+
+        return Response(response)

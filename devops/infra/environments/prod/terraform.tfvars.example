@@ -1,9 +1,9 @@
 # Copy to terraform.tfvars (git-ignored) and fill in real values.
 # Never commit terraform.tfvars — use GitHub Secrets + TF_VAR_ env vars in CI.
 
-region                = "ap-southeast-1"
+region                = "eu-west-1"
 app_db_password       = "change-me-strong-password"
 warehouse_db_password = "change-me-strong-password"
 
-# Request a free cert in ACM (ap-southeast-1) for your domain, then paste its ARN here.
-acm_certificate_arn   = "arn:aws:acm:ap-southeast-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+# Request a free cert in ACM (eu-west-1) for your domain, then paste its ARN here.
+acm_certificate_arn   = "arn:aws:acm:eu-west-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

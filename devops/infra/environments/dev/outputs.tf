@@ -50,8 +50,14 @@ output "db_credentials_warehouse" {
 }
 
 output "app_db_endpoint" {
-  description = "App DB hostname (private — reach via SSH tunnel below)"
+  description = "App DB hostname — connect directly (no tunnel needed in dev)"
   value       = module.rds.app_db_endpoint
+}
+
+output "app_db_direct_url" {
+  description = "Ready-to-use connection URL — paste into DBeaver, psql, or .env"
+  value       = "postgresql://insightflow:${var.app_db_password}@${module.rds.app_db_endpoint}:5432/insightflow_app"
+  sensitive   = true
 }
 
 output "app_db_tunnel_command" {
@@ -65,8 +71,14 @@ output "app_db_psql_command" {
 }
 
 output "warehouse_db_endpoint" {
-  description = "Warehouse DB hostname (private — reach via SSH tunnel below)"
+  description = "Warehouse DB hostname — connect directly (no tunnel needed in dev)"
   value       = module.rds.warehouse_db_endpoint
+}
+
+output "warehouse_db_direct_url" {
+  description = "Ready-to-use connection URL for the warehouse DB"
+  value       = "postgresql://insightflow_wh:${var.warehouse_db_password}@${module.rds.warehouse_db_endpoint}:5432/insightflow_warehouse"
+  sensitive   = true
 }
 
 output "warehouse_db_tunnel_command" {

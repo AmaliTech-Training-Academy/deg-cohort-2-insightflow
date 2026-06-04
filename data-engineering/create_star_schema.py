@@ -1,69 +1,93 @@
-"""Create Star Schema for InsightFlow Retail Analytics"""
+"""Create the InsightFlow star-schema on the target warehouse database.
 
-from config import DATABASE_URL
-from sqlalchemy import create_engine, text
+Reads DDL from warehouse/schema.sql and executes every statement against
+the warehouse connection configured via environment variables.  Safe to run
+multiple times (all statements use IF NOT EXISTS).
 
-engine = create_engine(DATABASE_URL)
-
-SCHEMA_SQL = """
--- Dimension: Date
-CREATE TABLE IF NOT EXISTS dim_date (
-    date_key SERIAL PRIMARY KEY,
-    full_date DATE UNIQUE NOT NULL,
-    year INTEGER, quarter INTEGER, month INTEGER,
-    day INTEGER, day_of_week INTEGER, week_of_year INTEGER,
-    month_name VARCHAR(20), day_name VARCHAR(20),
-    is_weekend BOOLEAN
-);
-
--- Dimension: Product
-CREATE TABLE IF NOT EXISTS dim_product (
-    product_key SERIAL PRIMARY KEY,
-    product_name VARCHAR(255) NOT NULL,
-    category VARCHAR(100),
-    unit_price NUMERIC(10,2)
-);
-
--- Dimension: Customer
-CREATE TABLE IF NOT EXISTS dim_customer (
-    customer_key SERIAL PRIMARY KEY,
-    customer_id INTEGER UNIQUE NOT NULL,
-    segment VARCHAR(50)
-);
-
--- Dimension: Region
-CREATE TABLE IF NOT EXISTS dim_region (
-    region_key SERIAL PRIMARY KEY,
-    region_name VARCHAR(255) NOT NULL,
-    country VARCHAR(100)
-);
-
--- Fact: Sales
-CREATE TABLE IF NOT EXISTS fact_sales (
-    sale_key SERIAL PRIMARY KEY,
-    date_key INTEGER REFERENCES dim_date(date_key),
-    product_key INTEGER REFERENCES dim_product(product_key),
-    customer_key INTEGER REFERENCES dim_customer(customer_key),
-    region_key INTEGER REFERENCES dim_region(region_key),
-    quantity INTEGER,
-    unit_price NUMERIC(10,2),
-    total_amount NUMERIC(12,2),
-    source VARCHAR(50)
-);
-
--- TODO: Add fact_feedback table for customer satisfaction analytics
--- TODO: Add dim_channel for online vs in-store tracking
+Designed to run as a Docker init container:
+  - Retries the DB connection up to MAX_RETRIES times with RETRY_DELAY
+    seconds between attempts so it survives a slow container start-up.
+  - Exits 0 on success, 1 on unrecoverable failure.
 """
 
+import logging
+import re
+import sys
+import time
+from pathlib import Path
 
-def create_schema():
-    with engine.connect() as conn:
-        for stmt in SCHEMA_SQL.split(";"):
-            stmt = stmt.strip()
-            if stmt and not stmt.startswith("--"):
-                conn.execute(text(stmt))
-        conn.commit()
-    print("Star schema created successfully!")
+from config import WAREHOUSE_DATABASE_URL
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+SCHEMA_FILE = Path(__file__).parent / "warehouse" / "schema.sql"
+MAX_RETRIES = 10
+RETRY_DELAY = 5  # seconds between connection attempts
+
+
+def _parse_sql(sql: str) -> list[str]:
+    """Strip comments and split on semicolons into executable statements."""
+    sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
+    sql = re.sub(r"--[^\n]*", "", sql)
+    return [s.strip() for s in sql.split(";") if s.strip()]
+
+
+def create_schema(database_url: str = WAREHOUSE_DATABASE_URL) -> None:
+    """Create all star-schema tables and indexes in the warehouse database.
+
+    Retries the initial connection up to MAX_RETRIES times so this function
+    can be called immediately after the DB container starts.
+
+    Raises
+    ------
+    SystemExit(1)
+        On unrecoverable error after all retries are exhausted.
+    """
+    log.info("Target warehouse: %s", database_url.split("@")[-1])
+
+    raw_sql = SCHEMA_FILE.read_text(encoding="utf-8")
+    statements = _parse_sql(raw_sql)
+    log.info("Parsed %d DDL statements from schema.sql", len(statements))
+
+    engine = create_engine(database_url, echo=False)
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            with engine.begin() as conn:
+                for stmt in statements:
+                    conn.execute(text(stmt))
+                    log.info("  OK  %s", stmt.splitlines()[0][:80])
+            log.info("Star schema ready — %d statements executed.", len(statements))
+            engine.dispose()
+            return
+        except OperationalError as exc:
+            if attempt < MAX_RETRIES:
+                log.warning(
+                    "DB not reachable (attempt %d/%d) — retrying in %ds: %s",
+                    attempt,
+                    MAX_RETRIES,
+                    RETRY_DELAY,
+                    exc.orig,
+                )
+                time.sleep(RETRY_DELAY)
+            else:
+                log.error(
+                    "Cannot reach warehouse DB after %d attempts — aborting.",
+                    MAX_RETRIES,
+                )
+                engine.dispose()
+                sys.exit(1)
+        except SQLAlchemyError as exc:
+            log.error("Schema creation failed: %s", exc)
+            engine.dispose()
+            sys.exit(1)
 
 
 if __name__ == "__main__":

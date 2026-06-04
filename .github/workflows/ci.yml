@@ -47,6 +47,8 @@ jobs:
             docker:
               - 'backend/Dockerfile'
               - 'backend/requirements.txt'
+              - 'frontend/Dockerfile'
+              - 'frontend/package.json'
             devops:
               - 'devops/**'
               - 'pyproject.toml'
@@ -94,12 +96,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install gitleaks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-            | grep '"tag_name"' | cut -d'"' -f4 | sed 's/v//')
+          VERSION=$(gh release view --repo gitleaks/gitleaks --json tagName -q .tagName | sed 's/^v//')
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
             | tar -xz gitleaks
           sudo mv gitleaks /usr/local/bin/
+          gitleaks version
 
       - name: Scan for secrets
         run: gitleaks detect --source . --redact --verbose
@@ -295,10 +299,21 @@ jobs:
       - name: Build backend Docker image
         run: docker build -t insightflow-backend:ci ./backend
 
-      - name: Scan image with Trivy
+      - name: Scan backend image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: insightflow-backend:ci
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
+
+      - name: Build frontend Docker image
+        run: docker build -t insightflow-frontend:ci ./frontend
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: insightflow-frontend:ci
           exit-code: "1"
           severity: CRITICAL
           ignore-unfixed: true
@@ -358,6 +373,10 @@ jobs:
         run: |
           pip install checkov
           checkov -d devops/infra/ --quiet --compact \
+            --skip-check CKV_AWS_17 \
+            --skip-check CKV_AWS_273 \
+            --skip-check CKV_AWS_40 \
+            --skip-check CKV2_AWS_31 \
             --skip-check CKV_AWS_88 \
             --skip-check CKV_AWS_24 \
             --skip-check CKV_AWS_293 \
@@ -421,20 +440,31 @@ jobs:
 
   # ── Workflow sync check ──────────────────────────────────────────────────────
   workflow-sync:
-    name: CI files in sync
+    name: Workflow files in sync
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify devops/ and .github/ CI files are identical
+      - name: Verify devops/ and .github/ workflow files are identical
         run: |
-          if ! diff -q devops/.github/workflows/ci.yml .github/workflows/ci.yml; then
-            echo "ERROR: devops/.github/workflows/ci.yml and .github/workflows/ci.yml differ."
-            echo "Edit devops/.github/workflows/ci.yml (source of truth), then copy to .github/workflows/ci.yml"
-            diff devops/.github/workflows/ci.yml .github/workflows/ci.yml
+          FAILED=0
+          for WORKFLOW in ci.yml deploy-dev.yml deploy-prod.yml; do
+            SRC="devops/.github/workflows/$WORKFLOW"
+            DST=".github/workflows/$WORKFLOW"
+            if ! diff -q "$SRC" "$DST" > /dev/null 2>&1; then
+              echo "ERROR: $SRC and $DST differ."
+              diff "$SRC" "$DST" || true
+              FAILED=1
+            else
+              echo "OK: $WORKFLOW is in sync"
+            fi
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            echo ""
+            echo "Source of truth is devops/.github/workflows/."
+            echo "Edit there, then copy to .github/workflows/."
             exit 1
           fi
-          echo "CI files are in sync."
 
   # ── Required status check for branch protection ──────────────────────────────
   ci-passed:

@@ -42,12 +42,16 @@ repos:
         files: ^(backend|data-engineering|qa)/
         exclude: migrations/
 
-  # Static type checking
+  # Static type checking — qa/ is included in `files` for black/isort/flake8
+  # but excluded here because qa/data-engineering/conftest.py and
+  # qa/api-tests/conftest.py share the same module name and hyphenated
+  # directory names cannot form valid Python package paths for mypy.
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.10.0
     hooks:
       - id: mypy
         files: ^(backend|data-engineering|qa)/
+        exclude: ^qa/
         args: ["--config-file", "pyproject.toml"]
         additional_dependencies:
           - types-requests
@@ -60,6 +64,7 @@ repos:
         args: ["-c", "pyproject.toml"]
         files: ^(backend|data-engineering)/
         exclude: ^(backend|data-engineering)/.*(test|sample_data).*
+        additional_dependencies: ["bandit[toml]"]
 
   # Conventional commit messages
   - repo: https://github.com/compilerla/conventional-pre-commit

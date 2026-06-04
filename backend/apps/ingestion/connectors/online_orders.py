@@ -1,35 +1,46 @@
-"""HTTP client for the external Online Orders API."""
-
+import logging
 import os
+from collections.abc import Generator
 from typing import Any
 
 import requests
 
+logger = logging.getLogger(__name__)
 
-class OnlineOrdersAPIClient:
-    """Thin wrapper around the external online-orders REST API."""
+_DEFAULT_LIMIT = 100
+_TIMEOUT = 30
 
-    def __init__(self, base_url: str | None = None, api_key: str | None = None):
-        env_base_url = os.environ.get("ONLINE_ORDERS_API_URL", "")
-        self.base_url = (base_url or env_base_url or "").rstrip("/")
-        self.api_key = api_key or os.environ.get("ONLINE_ORDERS_API_KEY", "")
-        self.session = requests.Session()
-        if self.api_key:
-            self.session.headers["Authorization"] = f"Bearer {self.api_key}"
 
-    def _get(self, path: str, params: dict | None = None) -> dict[Any, Any]:
-        url = f"{self.base_url}{path}"
-        response = self.session.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        data: Any = response.json()
-        if not isinstance(data, dict):
-            return {}
-        return data
+class OnlineOrdersAPIError(Exception):
+    pass
 
-    def fetch_orders(self, page: int = 1, page_size: int = 100) -> dict[Any, Any]:
-        """Fetch a page of orders from the external API."""
-        return self._get("/orders", params={"page": page, "page_size": page_size})
 
-    def fetch_order(self, order_id: str) -> dict[Any, Any]:
-        """Fetch a single order by ID."""
-        return self._get(f"/orders/{order_id}")
+def _base_url() -> str:
+    url = os.environ.get("ONLINE_ORDERS_API_URL", "").rstrip("/")
+    if not url:
+        raise OnlineOrdersAPIError("ONLINE_ORDERS_API_URL is not configured.")
+    return url
+
+
+def fetch_orders_page(page: int, limit: int = _DEFAULT_LIMIT) -> dict[str, Any]:
+    url = f"{_base_url()}/api/orders"
+    try:
+        resp = requests.get(
+            url, params={"page": page, "limit": limit}, timeout=_TIMEOUT
+        )
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
+    except requests.exceptions.RequestException as exc:
+        logger.error("Online orders API error page=%s: %s", page, exc)
+        raise OnlineOrdersAPIError(str(exc)) from exc
+
+
+def iter_all_pages(
+    limit: int = _DEFAULT_LIMIT,
+) -> Generator[list[dict[str, Any]], None, None]:
+    first = fetch_orders_page(page=1, limit=limit)
+    yield first["data"]
+    total_pages: int = first.get("totalPages", 1)
+    for page in range(2, total_pages + 1):
+        payload = fetch_orders_page(page=page, limit=limit)
+        yield payload["data"]
