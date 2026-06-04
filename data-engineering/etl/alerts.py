@@ -52,7 +52,7 @@ class AlertManager:
             When the resolved severity is CRITICAL.
         """
         overall_score: float = quality_summary.get("overall_score", 1.0)
-        table: str = quality_summary.get("table", "unknown")
+        table: str = quality_summary.get("source", quality_summary.get("table", "unknown"))
         threshold = QUALITY_THRESHOLDS.get(table, 0.95)
 
         resolved_severity = "CRITICAL" if overall_score < threshold else "WARNING"
