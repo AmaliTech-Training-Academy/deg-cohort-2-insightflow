@@ -133,6 +133,7 @@ services:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl
+    env_file: .env
     environment:
       # Source — OLTP app database
       DB_HOST: ${DB_HOST:-postgres-app}
