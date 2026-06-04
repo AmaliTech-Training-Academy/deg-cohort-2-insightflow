@@ -58,6 +58,13 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/frontend
+        awslogs-stream: frontend
+        awslogs-create-group: "true"
     restart: unless-stopped
 
   backend:
@@ -95,6 +102,13 @@ services:
       timeout: 10s
       retries: 10
       start_period: 300s
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/backend
+        awslogs-stream: backend
+        awslogs-create-group: "true"
     command: >
       sh -c "python manage.py migrate &&
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
@@ -125,6 +139,13 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/celery-worker
+        awslogs-stream: celery-worker
+        awslogs-create-group: "true"
     command: celery -A insightflow worker --loglevel=info --concurrency=2
 
   etl:
@@ -158,6 +179,13 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/etl
+        awslogs-stream: etl
+        awslogs-create-group: "true"
     command: python etl_pipeline.py
 
   etl-listener:
@@ -179,6 +207,13 @@ services:
         condition: service_healthy
       postgres-app:
         condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/etl-listener
+        awslogs-stream: etl-listener
+        awslogs-create-group: "true"
     restart: unless-stopped
     command: >
       sh -c "python trigger_setup.py install &&
@@ -202,6 +237,13 @@ services:
         condition: service_healthy
       postgres-warehouse:
         condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/etl-worker
+        awslogs-stream: etl-worker
+        awslogs-create-group: "true"
     restart: unless-stopped
     command: >
       celery -A celery_app worker
