@@ -1,6 +1,7 @@
 from apps.ingestion.models.base import Customer, InjectionJob
 from apps.ingestion.models.feedback import FeedbackSurvey
 from apps.ingestion.models.inventory import Category, Inventory, Product, Store
+from apps.ingestion.models.online_injection_job import OnlineInjectionJob
 from apps.ingestion.models.online_orders import OnlineOrder, OnlineOrderLine
 from apps.ingestion.models.pos import (
     Cashier,
@@ -15,6 +16,7 @@ __all__ = [
     "Category",
     "Product",
     "Store",
+    "OnlineInjectionJob",
     "OnlineOrder",
     "OnlineOrderLine",
     "Cashier",

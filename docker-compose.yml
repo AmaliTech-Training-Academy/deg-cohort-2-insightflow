@@ -61,7 +61,6 @@ services:
       start_period: 90s
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py seed_data &&
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
   celery-worker:
@@ -166,8 +165,8 @@ services:
              --concurrency=1
 
   # ── Metabase ──────────────────────────────────────────────────────────────────
-  # Analytics/BI layer backed by the RDS warehouse DB.
-  # metabase-setup runs once to configure the data source, then exits.
+  # Analytics/BI layer — warehouse DB is external (RDS), configured via .env.
+  # metabase-setup runs once to register the data source, then exits.
   metabase:
     image: metabase/metabase:latest
     container_name: insightflow-metabase
@@ -188,34 +187,18 @@ services:
     restart: unless-stopped
 
   metabase-setup:
-    image: curlimages/curl:latest
+    image: insightflow-etl:${DEPLOY_TAG:-local}
+    build:
+      context: ./data-engineering
+      dockerfile: Dockerfile
     container_name: insightflow-metabase-setup
-    environment:
-      METABASE_URL: ${METABASE_URL:-http://metabase:3000}
-      METABASE_ADMIN_EMAIL: ${METABASE_ADMIN_EMAIL}
-      METABASE_ADMIN_PASSWORD: ${METABASE_ADMIN_PASSWORD}
-      METABASE_DB_NAME: ${METABASE_DB_NAME:-InsightFlow Warehouse}
-      METABASE_DB_HOST: ${METABASE_DB_HOST}
-      METABASE_DB_PORT: ${METABASE_DB_PORT:-5432}
-      METABASE_DB_DATABASE: ${METABASE_DB_DATABASE}
-      METABASE_DB_USER: ${METABASE_DB_USER}
-      METABASE_DB_PASSWORD: ${METABASE_DB_PASSWORD}
+    env_file: .env
     depends_on:
       metabase:
         condition: service_healthy
     restart: "no"
     command: >
-      sh -c "
-        TOKEN=$$(curl -sf -X POST $$METABASE_URL/api/session
-          -H 'Content-Type: application/json'
-          -d '{\"username\":\"'$$METABASE_ADMIN_EMAIL'\",\"password\":\"'$$METABASE_ADMIN_PASSWORD'\"}' |
-          grep -o '\"id\":\"[^\"]*' | cut -d'\"' -f4) &&
-        curl -sf -X POST $$METABASE_URL/api/database
-          -H 'Content-Type: application/json'
-          -H \"X-Metabase-Session: $$TOKEN\"
-          -d '{\"engine\":\"postgres\",\"name\":\"'$$METABASE_DB_NAME'\",\"details\":{\"host\":\"'$$METABASE_DB_HOST'\",\"port\":'$$METABASE_DB_PORT',\"dbname\":\"'$$METABASE_DB_DATABASE'\",\"user\":\"'$$METABASE_DB_USER'\",\"password\":\"'$$METABASE_DB_PASSWORD'\"}}' &&
-        echo 'Metabase data source configured'
-      "
+      sh -c "cd data-engineering/metabase_setup && python metabase_setup.py"
 
 volumes:
   redis-data:

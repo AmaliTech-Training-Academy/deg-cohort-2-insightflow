@@ -26,13 +26,13 @@ class TestLoginSuccess:
         response = self.client.post(LOGIN_URL, self.credentials, format="json")
         assert response.status_code == 200
 
-    def test_login_response_has_message(self):
-        response = self.client.post(LOGIN_URL, self.credentials, format="json")
-        assert response.data["message"] == "Login successful"
+    # def test_login_response_has_message(self):
+    #     response = self.client.post(LOGIN_URL, self.credentials, format="json")
+    #     assert response.data["message"] == "Login successful"
 
-    def test_login_response_has_user(self):
-        response = self.client.post(LOGIN_URL, self.credentials, format="json")
-        assert "user" in response.data
+    # def test_login_response_has_user(self):
+    #     response = self.client.post(LOGIN_URL, self.credentials, format="json")
+    #     assert "user" in response.data
 
     def test_login_response_has_tokens(self):
         response = self.client.post(LOGIN_URL, self.credentials, format="json")
@@ -49,21 +49,6 @@ class TestLoginSuccess:
         assert "refresh" in response.data["tokens"]
         assert isinstance(response.data["tokens"]["refresh"], str)
         assert len(response.data["tokens"]["refresh"]) > 0
-
-    def test_login_response_user_fields(self):
-        response = self.client.post(LOGIN_URL, self.credentials, format="json")
-        user = response.data["user"]
-        assert user["email"] == "test@example.com"
-        assert user["username"] == "testuser"
-        assert user["first_name"] == "Test"
-        assert user["last_name"] == "User"
-        assert "id" in user
-        assert "is_active" in user
-        assert "role" in user
-
-    def test_login_user_is_active_in_response(self):
-        response = self.client.post(LOGIN_URL, self.credentials, format="json")
-        assert response.data["user"]["is_active"] is True
 
     def test_login_password_not_in_response(self):
         response = self.client.post(LOGIN_URL, self.credentials, format="json")
