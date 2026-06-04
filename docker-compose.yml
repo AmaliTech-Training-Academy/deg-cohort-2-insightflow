@@ -61,7 +61,6 @@ services:
       start_period: 90s
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py seed_data &&
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
 
   celery-worker:
