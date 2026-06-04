@@ -101,8 +101,8 @@ module "ec2" {
   region             = var.region
   subnet_id          = module.vpc.public_subnet_a_id
   security_group_id  = module.security_groups.ec2_sg_id
-  instance_type      = "t3.small"
-  root_volume_gb     = 30
+  instance_type      = "t3.xlarge"
+  root_volume_gb     = 50
   enable_public_ip   = true
   key_name           = aws_key_pair.dev.key_name
   s3_bucket_name     = module.s3.bucket_name
