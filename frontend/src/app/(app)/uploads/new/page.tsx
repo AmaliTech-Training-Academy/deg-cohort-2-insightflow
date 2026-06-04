@@ -113,8 +113,8 @@ export default function NewUploadPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">New upload</h1>
-        <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-          Import POS transactions from a CSV export
+        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+          Import POS transactions from a CSV export.
         </p>
       </div>
 
@@ -190,7 +190,7 @@ function StepBar({ current }: { current: StepNumber }) {
                 </span>
               </div>
               {idx < STEPS.length - 1 && (
-                <div className="flex-1 mx-3 h-px bg-gray-200 dark:bg-slate-700" />
+                <div className={`flex-1 mx-3 h-px transition-colors ${done ? "bg-green-500" : "bg-gray-200 dark:bg-slate-700"}`} />
               )}
             </li>
           );
@@ -332,18 +332,18 @@ function StepPreview({
 
 function StepUpload({ isError, onRetry }: { isError: boolean; onRetry: () => void }) {
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-8 flex flex-col items-center gap-4">
+    <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 py-16 flex flex-col items-center gap-3 text-center">
       {!isError ? (
         <>
-          <span className="animate-spin text-green-600"><SpinnerLargeIcon /></span>
-          <p className="text-sm font-medium text-gray-700 dark:text-slate-300">Uploading your file…</p>
+          <span className="animate-spin text-green-600 mb-1"><SpinnerLargeIcon /></span>
+          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">Uploading your file…</p>
           <p className="text-xs text-gray-400 dark:text-slate-500">This usually takes a few seconds.</p>
         </>
       ) : (
-        <>
+        <div className="w-full max-w-sm space-y-4">
           <AlertBanner variant="error" message="Upload failed. Please check your connection and try again." />
-          <Button variant="secondary" onClick={onRetry}>Retry upload</Button>
-        </>
+          <Button variant="secondary" onClick={onRetry} className="w-full">Retry upload</Button>
+        </div>
       )}
     </div>
   );
@@ -358,27 +358,27 @@ function StepProcess({ job }: { job: IngestionJob | undefined }) {
       : 0;
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-8 space-y-4">
-      <div className="flex items-center gap-3">
-        <span className="animate-spin text-green-600 shrink-0"><SpinnerLargeIcon /></span>
+    <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 py-12">
+      <div className="flex flex-col items-center gap-3 text-center mb-6">
+        <span className="animate-spin text-green-600"><SpinnerLargeIcon /></span>
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-slate-100">Processing records…</p>
-          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
             {job?.status === "pending" ? "Queued, starting soon" : "Validating and inserting rows"}
           </p>
         </div>
-        {job && <div className="ml-auto"><StatusBadge status={job.status} /></div>}
+        {job && <StatusBadge status={job.status} />}
       </div>
 
       {job?.status === "processing" && job.recordsTotal && (
-        <div className="space-y-1.5">
-          <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+        <div className="max-w-sm mx-auto space-y-2">
+          <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
             <div
               className="h-full bg-green-500 rounded-full transition-all duration-700"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-xs text-gray-400 dark:text-slate-500">
+          <p className="text-xs text-gray-400 dark:text-slate-500 text-center tabular-nums">
             {job.recordsProcessed?.toLocaleString()} / {job.recordsTotal.toLocaleString()} rows — {progress}%
           </p>
         </div>
@@ -419,9 +419,15 @@ function StepSummary({
 
       {success && job?.recordsProcessed != null && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <SummaryTile label="Records ingested" value={job.recordsProcessed.toLocaleString()} color="green" />
+          <SummaryTile label="Inserted" value={job.recordsProcessed.toLocaleString()} color="green" />
           {job.recordsTotal != null && (
             <SummaryTile label="Total rows" value={job.recordsTotal.toLocaleString()} color="gray" />
+          )}
+          {(job.rejectedRows ?? 0) > 0 && (
+            <SummaryTile label="FK misses" value={(job.rejectedRows ?? 0).toLocaleString()} color="yellow" />
+          )}
+          {(job.errorRows ?? 0) > 0 && (
+            <SummaryTile label="Format errors" value={(job.errorRows ?? 0).toLocaleString()} color="red" />
           )}
         </div>
       )}
@@ -440,13 +446,16 @@ function StepSummary({
   );
 }
 
-function SummaryTile({ label, value, color }: { label: string; value: string; color: "green" | "gray" }) {
+function SummaryTile({ label, value, color }: { label: string; value: string; color: "green" | "gray" | "yellow" | "red" }) {
+  const valueClass =
+    color === "green" ? "text-green-600 dark:text-green-400"
+    : color === "yellow" ? "text-yellow-600 dark:text-yellow-400"
+    : color === "red" ? "text-red-600 dark:text-red-400"
+    : "text-gray-900 dark:text-slate-100";
   return (
-    <div className="rounded-md border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 px-4 py-3">
-      <p className={`text-xl font-bold ${color === "green" ? "text-green-600 dark:text-green-400" : "text-gray-900 dark:text-slate-100"}`}>
-        {value}
-      </p>
-      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{label}</p>
+    <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 px-5 py-4">
+      <p className={`text-2xl font-bold tabular-nums leading-none ${valueClass}`}>{value}</p>
+      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5">{label}</p>
     </div>
   );
 }

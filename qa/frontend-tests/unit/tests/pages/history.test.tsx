@@ -68,11 +68,16 @@ describe("IngestionHistoryPage", () => {
     });
   });
 
-  it("shows error message inline for failed jobs", async () => {
+  it("shows error message under filename for failed jobs (not in Records column)", async () => {
     wrap(<HistoryPage />);
     await waitFor(() =>
       expect(screen.getByText("Invalid column type")).toBeInTheDocument()
     );
+  });
+
+  it("shows dash in Records column for failed jobs", async () => {
+    wrap(<HistoryPage />);
+    await waitFor(() => expect(screen.getAllByText("—").length).toBeGreaterThan(0));
   });
 
   it("shows dash for pending/processing records", async () => {

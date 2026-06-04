@@ -333,6 +333,76 @@ def _send_email(
 
 
 # ---------------------------------------------------------------------------
+# Immediate critical-quality alert
+# ---------------------------------------------------------------------------
+
+
+def send_critical_alert(
+    table: str, score: float, threshold: float, total_rows: int, failed_rows: int
+) -> None:
+    """Send an immediate plain-text email when a quality gate is CRITICAL.
+
+    Fires as soon as a CRITICAL quality result is detected so the team is
+    notified without waiting for the end-of-run report.  Delivery failures
+    are logged but never abort the pipeline.
+
+    Parameters
+    ----------
+    table:
+        Source table name (e.g. ``"onlineOrders"``).
+    score:
+        Overall quality score (0–1).
+    threshold:
+        Minimum acceptable score for this table.
+    total_rows / failed_rows:
+        Row counts for context in the alert body.
+    """
+    smtp_user = os.getenv("SMTP_USER", "")
+    if not smtp_user:
+        log.warning(
+            "SMTP_USER not set — CRITICAL quality alert for '%s' not emailed.",
+            table,
+        )
+        return
+
+    recipient = os.getenv("REPORT_EMAIL_TO", _DEFAULT_RECIPIENT)
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+    detected_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    subject = f"[InsightFlow ETL] ⚠️ CRITICAL data quality — {table}"
+    body = (
+        f"Data quality alert — {detected_at}\n\n"
+        f"Table   : {table}\n"
+        f"Score   : {score:.4f}  (threshold: {threshold:.4f})\n"
+        f"Rows    : {failed_rows} of {total_rows} failed quality checks\n\n"
+        f"The failing rows have been skipped. The pipeline continues with "
+        f"passing rows only.\n\n"
+        f"Please investigate the source data in the OLTP database and correct "
+        f"or remove the invalid records."
+    )
+
+    try:
+        _send_email(
+            to=recipient,
+            subject=subject,
+            body=body,
+            attachment_name=f"critical_alert_{table}.txt",
+            attachment_content=body,
+            smtp_host=smtp_host,
+            smtp_port=smtp_port,
+            smtp_user=smtp_user,
+            smtp_password=smtp_password,
+            smtp_from=smtp_from,
+        )
+        log.info("Critical quality alert emailed to %s for table=%s", recipient, table)
+    except Exception as exc:
+        log.error("Failed to email critical alert for table=%s: %s", table, exc)
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 

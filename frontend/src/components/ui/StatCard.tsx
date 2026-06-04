@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 interface TrendProps {
   label: string;
   positive: boolean;
@@ -6,7 +8,7 @@ interface TrendProps {
 interface StatCardProps {
   label: string;
   value: string | number;
-  icon: React.ReactNode;
+  icon: ReactNode;
   iconBg?: string;
   iconColor?: string;
   trend?: TrendProps;
@@ -25,12 +27,18 @@ export function StatCard({
   return (
     <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm px-5 pt-5 pb-4">
       <div className="flex items-start justify-between mb-4">
-        <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg shrink-0 ${iconBg} ${iconColor}`}>
+        <span
+          className={`inline-flex items-center justify-center w-10 h-10 rounded-lg shrink-0 ${iconBg} ${iconColor}`}
+        >
           {icon}
         </span>
         {trend && (
           <span
-            className={`text-xs font-medium tabular-nums ${trend.positive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
+              trend.positive
+                ? "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400"
+                : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+            }`}
             aria-label={`Trend: ${trend.positive ? "up" : "down"} ${trend.label}`}
           >
             {trend.positive ? "↑" : "↓"} {trend.label}

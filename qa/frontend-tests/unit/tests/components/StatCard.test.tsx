@@ -44,7 +44,7 @@ describe("StatCard", () => {
     );
     const el = screen.getByLabelText("Trend: up 20% success rate");
     expect(el).toHaveTextContent("↑");
-    expect(el).toHaveClass("text-green-600");
+    expect(el).toHaveClass("text-green-700");
   });
 
   it("renders negative trend with down arrow", () => {
@@ -54,7 +54,7 @@ describe("StatCard", () => {
     );
     const el = screen.getByLabelText("Trend: down 2 need review");
     expect(el).toHaveTextContent("↓");
-    expect(el).toHaveClass("text-red-600");
+    expect(el).toHaveClass("text-red-700");
   });
 
   it("applies custom icon background and color classes", () => {
