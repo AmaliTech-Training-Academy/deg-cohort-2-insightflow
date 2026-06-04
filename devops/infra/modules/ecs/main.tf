@@ -68,6 +68,7 @@ resource "aws_security_group" "tasks" {
   }
 
   egress {
+    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -158,7 +159,12 @@ resource "aws_iam_role_policy" "task" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "*"
+        Resource = [
+          "${aws_cloudwatch_log_group.backend.arn}:*",
+          "${aws_cloudwatch_log_group.frontend.arn}:*",
+          "${aws_cloudwatch_log_group.celery.arn}:*",
+          "${aws_cloudwatch_log_group.etl.arn}:*",
+        ]
       },
       {
         Sid    = "SecretsRead"
@@ -346,13 +352,14 @@ resource "aws_ecs_task_definition" "migration" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name             = "migration"
-    image            = var.backend_image
-    essential        = true
-    environment      = local.backend_env
-    secrets          = local.db_secrets
-    logConfiguration = local.log_config_backend
-    command          = ["python", "manage.py", "migrate", "--noinput"]
+    name                   = "migration"
+    image                  = var.backend_image
+    essential              = true
+    readonlyRootFilesystem = true
+    environment            = local.backend_env
+    secrets                = local.db_secrets
+    logConfiguration       = local.log_config_backend
+    command                = ["python", "manage.py", "migrate", "--noinput"]
   }])
 
   tags = var.tags
@@ -390,13 +397,14 @@ resource "aws_ecs_task_definition" "frontend" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([{
-    name             = "frontend"
-    image            = var.frontend_image
-    essential        = true
-    portMappings     = [{ containerPort = 3000, protocol = "tcp" }]
-    environment      = []
-    secrets          = []
-    logConfiguration = local.log_config_frontend
+    name                   = "frontend"
+    image                  = var.frontend_image
+    essential              = true
+    readonlyRootFilesystem = true
+    portMappings           = [{ containerPort = 3000, protocol = "tcp" }]
+    environment            = []
+    secrets                = []
+    logConfiguration       = local.log_config_frontend
   }])
 
   tags = var.tags
