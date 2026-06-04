@@ -148,9 +148,7 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
-    command: >
-      sh -c "python create_star_schema.py &&
-             python etl_pipeline.py"
+    command: python etl_pipeline.py
 
   etl-listener:
     image: insightflow-etl:${DEPLOY_TAG:-local}
@@ -231,7 +229,7 @@ services:
         condition: service_healthy
     restart: "no"
     command: >
-      sh -c "cd data-engineering/metabase_setup && python metabase_setup.py"
+      sh -c "cd metabase_setup && python metabase_setup.py"
 
 volumes:
   pgdata-app:
