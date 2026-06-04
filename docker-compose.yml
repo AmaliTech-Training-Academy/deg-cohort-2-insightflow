@@ -164,14 +164,26 @@ services:
              --queues=etl
              --concurrency=1
 
+  # ── Metabase ──────────────────────────────────────────────────────────────────
+  # Analytics/BI layer — warehouse DB is external (RDS), configured via .env.
+  # metabase-setup runs once to register the data source, then exits.
   metabase:
     image: metabase/metabase:latest
     container_name: insightflow-metabase
     ports:
       - "3001:3000"
+    environment:
+      MB_DB_TYPE: h2
+    volumes:
+      - metabase-data:/metabase-data
     depends_on:
-      postgres-warehouse:
-        condition: service_healthy
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     restart: unless-stopped
 
   metabase-setup:
@@ -182,10 +194,8 @@ services:
     container_name: insightflow-metabase-setup
     env_file: .env
     depends_on:
-      postgres-warehouse:
-        condition: service_healthy
       metabase:
-        condition: service_started
+        condition: service_healthy
     restart: "no"
     command: >
       sh -c "cd data-engineering/metabase_setup && python metabase_setup.py"
@@ -193,3 +203,4 @@ services:
 volumes:
   redis-data:
   media-data:
+  metabase-data:
