@@ -41,6 +41,7 @@ class InjectionJob(models.Model):
         null=True, blank=True, help_text="Total rows counted before processing"
     )
     valid_rows = models.IntegerField(default=0)
+    rejected_rows = models.IntegerField(default=0)
     error_rows = models.IntegerField(default=0)
     error_report: dict[str, Any] | None = models.JSONField(  # type: ignore[assignment]
         null=True, blank=True, help_text="Detailed error logs filled after processing"

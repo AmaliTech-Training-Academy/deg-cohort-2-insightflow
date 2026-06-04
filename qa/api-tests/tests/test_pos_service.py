@@ -340,3 +340,352 @@ class TestPOSIngestionServiceAcceptUpload:
 
             assert mock_job.file == f
             mock_job.save.assert_called_once_with(update_fields=["file"])
+
+
+# ── Helpers shared by process_job tests ──────────────────────────────────────
+
+_VALID_CSV = (
+    "transaction_id,store_id,cashier_id,date,product_sku,"
+    "quantity,unit_price,discount_applied,total\n"
+    "1,1,10,2025-07-25T17:32:26,PROD-0000001,2,10.00,0.00,20.00\n"
+    "1,1,10,2025-07-25T17:32:26,PROD-0000002,3,5.00,0.00,15.00\n"
+    "2,2,20,2025-08-01T10:00:00,PROD-0000003,1,50.00,5.00,45.00\n"
+)
+
+_INVALID_CSV = (
+    "transaction_id,store_id,cashier_id,date,product_sku,"
+    "quantity,unit_price,discount_applied,total\n"
+    ",,,,,,,,\n"  # all empty — fails validation
+)
+
+_VALID_DF = pd.read_csv(io.StringIO(_VALID_CSV))
+_INVALID_DF = pd.read_csv(io.StringIO(_INVALID_CSV))
+
+
+def _make_process_job(
+    csv_content=_VALID_CSV,
+    store_ids=(1, 2),
+    cashier_ids=(10, 20),
+    product_skus=("PROD-0000001", "PROD-0000002", "PROD-0000003"),
+):
+    """Return a context-manager stack that patches all DB dependencies."""
+    import pandas as pd
+
+    df = pd.read_csv(io.StringIO(csv_content))
+    return (
+        patch("apps.ingestion.services.csv_services.pd.read_csv", return_value=df),
+        patch(
+            "apps.ingestion.services.csv_services.Store.objects.values_list",
+            return_value=list(store_ids),
+        ),
+        patch(
+            "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+            return_value=list(cashier_ids),
+        ),
+        patch(
+            "apps.ingestion.services.csv_services.Product.objects.values_list",
+            return_value=list(product_skus),
+        ),
+        patch(
+            "apps.ingestion.services.csv_services.PosTransaction.objects.bulk_create"
+        ),
+        patch(
+            "apps.ingestion.services.csv_services"
+            ".PosTransactionLine.objects.bulk_create"
+        ),
+        patch("apps.ingestion.services.csv_services.db_transaction.atomic"),
+    )
+
+
+def _make_job():
+    job = MagicMock()
+    job.id = 1
+    job.file.path = "/tmp/test.csv"
+    return job
+
+
+class TestPOSIngestionServiceProcessJob:
+    """Test POSIngestionService.process_job() — bulk insert optimisation."""
+
+    @pytest.fixture
+    def service(self):
+        return POSIngestionService()
+
+    def test_valid_csv_marks_job_completed(self, service):
+        """All-valid rows result in job status COMPLETED."""
+        job = _make_job()
+
+        with (
+            patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_csv,
+            patch(
+                "apps.ingestion.services.csv_services.Store.objects.values_list",
+                return_value=[1, 2],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+                return_value=[10, 20],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Product.objects.values_list",
+                return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransaction.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransactionLine.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.db_transaction.atomic"
+            ) as mock_atomic,
+        ):
+
+            mock_csv.return_value = _VALID_DF
+            mock_atomic.return_value.__enter__ = Mock(return_value=None)
+            mock_atomic.return_value.__exit__ = Mock(return_value=False)
+
+            service.process_job(job)
+
+        assert job.status == "completed"
+
+    def test_bulk_create_called_once_for_transactions(self, service):
+        """PosTransaction.bulk_create called exactly once regardless of row count."""
+        job = _make_job()
+
+        with (
+            patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_csv,
+            patch(
+                "apps.ingestion.services.csv_services.Store.objects.values_list",
+                return_value=[1, 2],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+                return_value=[10, 20],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Product.objects.values_list",
+                return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransaction.objects.bulk_create"
+            ) as mock_txn_bulk,
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransactionLine.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.db_transaction.atomic"
+            ) as mock_atomic,
+        ):
+
+            mock_csv.return_value = _VALID_DF
+            mock_atomic.return_value.__enter__ = Mock(return_value=None)
+            mock_atomic.return_value.__exit__ = Mock(return_value=False)
+
+            service.process_job(job)
+
+        mock_txn_bulk.assert_called_once()
+
+    def test_bulk_create_called_once_for_lines(self, service):
+        """PosTransactionLine.bulk_create called exactly once for all lines."""
+        job = _make_job()
+
+        with (
+            patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_csv,
+            patch(
+                "apps.ingestion.services.csv_services.Store.objects.values_list",
+                return_value=[1, 2],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+                return_value=[10, 20],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Product.objects.values_list",
+                return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransaction.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransactionLine.objects.bulk_create"
+            ) as mock_line_bulk,
+            patch(
+                "apps.ingestion.services.csv_services.db_transaction.atomic"
+            ) as mock_atomic,
+        ):
+
+            mock_csv.return_value = _VALID_DF
+            mock_atomic.return_value.__enter__ = Mock(return_value=None)
+            mock_atomic.return_value.__exit__ = Mock(return_value=False)
+
+            service.process_job(job)
+
+        mock_line_bulk.assert_called_once()
+
+    def test_missing_cashier_skipped_with_error_row(self, service):
+        """Transaction with unknown cashier_id is skipped and logged as error."""
+        job = _make_job()
+
+        with (
+            patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_csv,
+            patch(
+                "apps.ingestion.services.csv_services.Store.objects.values_list",
+                return_value=[1, 2],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+                return_value=[],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Product.objects.values_list",
+                return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransaction.objects.bulk_create"
+            ) as mock_txn_bulk,
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransactionLine.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.db_transaction.atomic"
+            ) as mock_atomic,
+        ):
+
+            mock_csv.return_value = _VALID_DF
+            mock_atomic.return_value.__enter__ = Mock(return_value=None)
+            mock_atomic.return_value.__exit__ = Mock(return_value=False)
+
+            service.process_job(job)
+
+        # No transactions inserted because all cashier IDs are unknown
+        mock_txn_bulk.assert_not_called()
+        assert job.rejected_rows > 0
+
+    def test_missing_product_skipped_with_error_row(self, service):
+        """Line item with unknown product_sku is skipped and logged as error."""
+        job = _make_job()
+
+        with (
+            patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_csv,
+            patch(
+                "apps.ingestion.services.csv_services.Store.objects.values_list",
+                return_value=[1, 2],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+                return_value=[10, 20],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Product.objects.values_list",
+                return_value=[],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransaction.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransactionLine.objects.bulk_create"
+            ) as mock_line_bulk,
+            patch(
+                "apps.ingestion.services.csv_services.db_transaction.atomic"
+            ) as mock_atomic,
+        ):
+
+            mock_csv.return_value = _VALID_DF
+            mock_atomic.return_value.__enter__ = Mock(return_value=None)
+            mock_atomic.return_value.__exit__ = Mock(return_value=False)
+
+            service.process_job(job)
+
+        # No lines inserted — all SKUs unknown
+        mock_line_bulk.assert_not_called()
+
+    def test_all_invalid_rows_marks_job_completed_with_errors(self, service):
+        """CSV with all invalid rows completes with error_rows > 0."""
+        job = _make_job()
+
+        with (
+            patch("apps.ingestion.services.csv_services.pd.read_csv") as mock_csv,
+            patch(
+                "apps.ingestion.services.csv_services.Store.objects.values_list",
+                return_value=[1],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Cashier.objects.values_list",
+                return_value=[10],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.Product.objects.values_list",
+                return_value=["PROD-0000001"],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransaction.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services"
+                ".PosTransactionLine.objects.bulk_create"
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.db_transaction.atomic"
+            ) as mock_atomic,
+        ):
+
+            mock_csv.return_value = _INVALID_DF
+            mock_atomic.return_value.__enter__ = Mock(return_value=None)
+            mock_atomic.return_value.__exit__ = Mock(return_value=False)
+
+            service.process_job(job)
+
+        assert job.status == "completed"
+        assert job.valid_rows == 0
+
+
+class TestPOSIngestionServiceParseDateField:
+    """Test POSIngestionService._parse_date_field() static method."""
+
+    def test_iso_datetime_with_microseconds(self):
+        """Full ISO 8601 datetime with microseconds parsed correctly."""
+        result = POSIngestionService._parse_date_field("2025-07-25T17:32:26.865133")
+        assert result is not None
+        assert result.year == 2025
+        assert result.hour == 17
+
+    def test_iso_datetime_without_microseconds(self):
+        """ISO 8601 datetime without microseconds parsed correctly."""
+        result = POSIngestionService._parse_date_field("2025-07-25T17:32:26")
+        assert result is not None
+        assert result.year == 2025
+
+    def test_date_only_yyyy_mm_dd(self):
+        """Date-only YYYY-MM-DD format parsed correctly."""
+        result = POSIngestionService._parse_date_field("2024-06-01")
+        assert result is not None
+        assert result.year == 2024
+        assert result.month == 6
+
+    def test_date_only_dd_mm_yyyy(self):
+        """Date-only DD/MM/YYYY format parsed correctly."""
+        result = POSIngestionService._parse_date_field("01/06/2024")
+        assert result is not None
+
+    def test_invalid_date_returns_none(self):
+        """Unparseable value returns None."""
+        assert POSIngestionService._parse_date_field("not-a-date") is None
+
+    def test_none_input_returns_none(self):
+        """None input returns None."""
+        assert POSIngestionService._parse_date_field(None) is None
+
+    def test_empty_string_returns_none(self):
+        """Empty string returns None."""
+        assert POSIngestionService._parse_date_field("") is None

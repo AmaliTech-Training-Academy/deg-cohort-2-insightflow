@@ -33,7 +33,8 @@ class IngestionJobStatusView(APIView):
         description=(
             "Returns the current state of a CSV ingestion job. "
             "Poll this endpoint after receiving a 202 from POST /api/ingestion/pos/. "
-            "The error_report field is only present once status is 'completed' or 'failed'."
+            "The error_report field is only present once status is "
+            "'completed' or 'failed'."
         ),
         parameters=[
             OpenApiParameter(
@@ -53,13 +54,25 @@ class IngestionJobStatusView(APIView):
                         choices=["pending", "running", "completed", "failed"]
                     ),
                     "total_rows": drf_serializers.IntegerField(),
-                    "valid_rows": drf_serializers.IntegerField(),
-                    "error_rows": drf_serializers.IntegerField(),
+                    "valid_rows": drf_serializers.IntegerField(
+                        help_text="Rows successfully inserted into the database."
+                    ),
+                    "rejected_rows": drf_serializers.IntegerField(
+                        help_text=(
+                            "Rows that passed CSV validation but were rejected "
+                            "at the DB level (unknown store, cashier, or product)."
+                        )
+                    ),
+                    "error_rows": drf_serializers.IntegerField(
+                        help_text="Rows that failed CSV format/type validation."
+                    ),
                     "created_at": drf_serializers.DateTimeField(),
                     "updated_at": drf_serializers.DateTimeField(),
                     "error_report": drf_serializers.DictField(
                         required=False,
-                        help_text="Only present when status is 'completed' or 'failed'.",
+                        help_text=(
+                            "Only present when status is 'completed' or 'failed'."
+                        ),
                     ),
                 },
             ),
@@ -89,6 +102,7 @@ class IngestionJobStatusView(APIView):
             "status": job.status,
             "total_rows": job.total_rows,
             "valid_rows": job.valid_rows,
+            "rejected_rows": job.rejected_rows,
             "error_rows": job.error_rows,
             "created_at": job.created_at,
             "updated_at": job.updated_at,
