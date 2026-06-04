@@ -83,14 +83,11 @@ export default function UploadHistoryPage() {
             <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700 text-sm">
               <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
-                  {["File", "Source", "Status", "Records", "Started"].map((h) => (
-                    <th
-                      key={h}
-                      className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400"
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">File</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Source</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Status</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Records</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Started</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
@@ -99,20 +96,20 @@ export default function UploadHistoryPage() {
                     key={job.id}
                     className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
                   >
-                    <td className="px-5 py-3 max-w-[200px]">
+                    <td className="px-5 py-3.5 max-w-[200px]">
                       <p className="font-medium text-gray-900 dark:text-slate-100 truncate">{job.fileName}</p>
-                      <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{job.id}</p>
+                      <p className="text-xs text-gray-400 dark:text-slate-500 truncate mt-0.5">{job.id}</p>
                     </td>
-                    <td className="px-5 py-3 text-gray-500 dark:text-slate-400 whitespace-nowrap">
+                    <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 whitespace-nowrap">
                       {SOURCE_LABELS[job.sourceType] ?? job.sourceType}
                     </td>
-                    <td className="px-5 py-3 whitespace-nowrap">
+                    <td className="px-5 py-3.5 whitespace-nowrap">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="px-5 py-3 text-gray-500 dark:text-slate-400 whitespace-nowrap">
+                    <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 whitespace-nowrap text-right tabular-nums">
                       <RecordsCell job={job} />
                     </td>
-                    <td className="px-5 py-3 text-gray-400 dark:text-slate-500 text-xs whitespace-nowrap">
+                    <td className="px-5 py-3.5 text-gray-400 dark:text-slate-500 text-xs whitespace-nowrap text-right tabular-nums">
                       {formatDate(job.createdAt)}
                     </td>
                   </tr>
