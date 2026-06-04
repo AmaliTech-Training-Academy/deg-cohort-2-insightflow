@@ -156,8 +156,6 @@ services:
         condition: service_healthy
       postgres-warehouse:
         condition: service_healthy
-      backend:
-        condition: service_healthy
     command: python etl_pipeline.py
 
   etl-listener:
