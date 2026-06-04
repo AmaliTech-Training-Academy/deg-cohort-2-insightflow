@@ -21,7 +21,7 @@ export default function DashboardPage() {
           <div className="h-8 w-40 rounded bg-gray-200 animate-pulse mb-2" />
           <div className="h-4 w-64 rounded bg-gray-200 animate-pulse" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-lg border border-gray-200 bg-white shadow-sm p-5 h-28 animate-pulse bg-gray-100" />
           ))}
@@ -54,20 +54,20 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           label="Jobs Today"
           value={data.jobsToday}
           icon={<BriefcaseIcon />}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
+          iconBg="bg-blue-50 dark:bg-blue-950/40"
+          iconColor="text-blue-600 dark:text-blue-400"
         />
         <StatCard
           label="Successful"
           value={data.jobsSuccessToday}
           icon={<CheckIcon />}
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
+          iconBg="bg-green-50 dark:bg-green-950/40"
+          iconColor="text-green-600 dark:text-green-400"
           trend={
             data.jobsToday > 0
               ? { label: `${successRate}% success rate`, positive: successRate >= 80 }
@@ -78,8 +78,8 @@ export default function DashboardPage() {
           label="Failed"
           value={data.jobsFailedToday}
           icon={<XCircleIcon />}
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
+          iconBg="bg-red-50 dark:bg-red-950/40"
+          iconColor="text-red-600 dark:text-red-400"
           trend={
             data.jobsFailedToday > 0
               ? { label: `${data.jobsFailedToday} need review`, positive: false }
@@ -90,8 +90,8 @@ export default function DashboardPage() {
           label="Records Ingested"
           value={data.recordsIngested}
           icon={<DatabaseIcon />}
-          iconBg="bg-purple-50"
-          iconColor="text-purple-600"
+          iconBg="bg-purple-50 dark:bg-purple-950/40"
+          iconColor="text-purple-600 dark:text-purple-400"
         />
       </div>
 

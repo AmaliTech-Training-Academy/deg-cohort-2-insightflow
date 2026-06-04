@@ -44,7 +44,7 @@ export default function UploadHistoryPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Ingestion history</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
@@ -80,39 +80,39 @@ export default function UploadHistoryPage() {
       {data && data.results.length > 0 && (
         <Card>
           <div className="overflow-x-auto -mx-5 -mt-5 -mb-5">
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700 text-sm">
+              <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
                   {["File", "Source", "Status", "Records", "Started"].map((h) => (
                     <th
                       key={h}
-                      className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500"
+                      className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
                 {data.results.map((job: IngestionJob) => (
                   <tr
                     key={job.id}
-                    className="hover:bg-gray-50 transition-colors"
+                    className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
                   >
                     <td className="px-5 py-3 max-w-[200px]">
-                      <p className="font-medium text-gray-900 truncate">{job.fileName}</p>
-                      <p className="text-xs text-gray-400 truncate">{job.id}</p>
+                      <p className="font-medium text-gray-900 dark:text-slate-100 truncate">{job.fileName}</p>
+                      <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{job.id}</p>
                     </td>
-                    <td className="px-5 py-3 text-gray-500 whitespace-nowrap">
+                    <td className="px-5 py-3 text-gray-500 dark:text-slate-400 whitespace-nowrap">
                       {SOURCE_LABELS[job.sourceType] ?? job.sourceType}
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="px-5 py-3 text-gray-500 whitespace-nowrap">
+                    <td className="px-5 py-3 text-gray-500 dark:text-slate-400 whitespace-nowrap">
                       <RecordsCell job={job} />
                     </td>
-                    <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">
+                    <td className="px-5 py-3 text-gray-400 dark:text-slate-500 text-xs whitespace-nowrap">
                       {formatDate(job.createdAt)}
                     </td>
                   </tr>
