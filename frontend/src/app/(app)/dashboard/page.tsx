@@ -12,6 +12,8 @@ export default function DashboardPage() {
     queryKey: ["dashboard-stats"],
     queryFn: getDashboardStats,
     refetchInterval: 30_000,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   if (isLoading) {

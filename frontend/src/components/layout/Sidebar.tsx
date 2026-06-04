@@ -29,7 +29,7 @@ const NAV: NavSection[] = [
   {
     section: "ANALYTICS",
     items: [
-      { href: "#", label: "Metabase", icon: <ExternalLinkIcon />, external: true },
+      { href: "http://insightflow-dev-alb-718274835.eu-west-1.elb.amazonaws.com:3001/dashboard/2", label: "Metabase", icon: <ExternalLinkIcon />, external: true },
     ],
   },
 ];
