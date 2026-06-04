@@ -1,37 +1,39 @@
-name: Deploy → Prod
+name: Deploy → Prod (ECS Fargate)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SOURCE OF TRUTH: devops/.github/workflows/deploy-prod.yml
 # Mirror:          .github/workflows/deploy-prod.yml  (read by GitHub Actions)
 # Keep both files identical. Edit here, then copy to .github/workflows/.
+#
+# Pipeline:
+#   approve ──► build (ECR) ──► migrate ──► deploy (ECS) ──► smoke-test
+#
+# Zero-downtime: ECS rolling update keeps minimumHealthyPercent=100; old tasks
+# serve traffic until new tasks pass ALB health checks.
+# Rollback: re-run this workflow on the previous commit — ECS re-registers the
+# old task definition revision and the service converges on it automatically.
 # ─────────────────────────────────────────────────────────────────────────────
-
-# Triggers on every push to main.
-# Infrastructure is provisioned manually — no Terraform in this pipeline.
-# Pipeline: approve (manual gate) ──► deploy (SSM) ──► summary
 on:
   push:
     branches: [main]
 
 concurrency:
   group: deploy-prod
-  cancel-in-progress: false   # never abort an in-flight deploy
+  cancel-in-progress: false
 
 permissions:
   id-token: write   # OIDC → AWS assume-role
   contents: read
 
 env:
-  AWS_REGION:    eu-west-1
-  ENV_CONFIG:    devops/scripts/envs/prod.env
-  DEPLOY_SCRIPT: devops/scripts/zero-downtime-deploy.sh
-  SSM_WAIT:      devops/scripts/ssm-wait.sh
+  AWS_REGION:  eu-west-1
+  ECS_CLUSTER: insightflow-prod
+  ENV_CONFIG:  devops/scripts/envs/prod.env
 
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ── Manual approval gate ─────────────────────────────────────────────────────
-  # A reviewer must approve before anything is deployed to production.
+  # ── Manual approval gate ──────────────────────────────────────────────────────
   approve:
     name: Await production approval
     runs-on: ubuntu-latest
@@ -39,16 +41,19 @@ jobs:
     steps:
       - name: Approved
         run: |
-          echo "Production deployment approved"
           echo "Commit : ${{ github.sha }}"
           echo "Pusher : ${{ github.actor }}"
 
-  # ── Deploy ─────────────────────────────────────────────────────────────────
-  deploy:
-    name: Deploy to EC2 (prod)
+  # ── Build & push all images to ECR ───────────────────────────────────────────
+  build:
+    name: Build & push to ECR
     runs-on: ubuntu-latest
     needs: approve
-    environment: production
+    outputs:
+      image_tag:      ${{ steps.meta.outputs.tag }}
+      backend_image:  ${{ steps.meta.outputs.backend }}
+      frontend_image: ${{ steps.meta.outputs.frontend }}
+      etl_image:      ${{ steps.meta.outputs.etl }}
 
     steps:
       - uses: actions/checkout@v4
@@ -59,126 +64,300 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
           aws-region:     ${{ env.AWS_REGION }}
 
-      - name: Make SSM helper executable
-        run: chmod +x "${{ env.SSM_WAIT }}"
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Upload docker-compose, env config, and deploy script
-        env:
-          INSTANCE: ${{ secrets.PROD_EC2_INSTANCE_ID }}
+      - name: Set image tag and URIs
+        id: meta
         run: |
-          ssm_upload() {
-            local src="$1" dst="$2" timeout="${3:-60}"
-            python3 -c "
-          import json, base64, sys
-          b64 = base64.b64encode(open(sys.argv[1], 'rb').read()).decode()
-          print(json.dumps({'commands': [
-              'mkdir -p $(dirname ' + sys.argv[2] + ')',
-              f\"printf '%s' '{b64}' | base64 -d > {sys.argv[2]}\",
-          ]}))
-          " "$src" "$dst" > /tmp/ssm-params.json
+          TAG="sha-${GITHUB_SHA::7}"
+          R="${{ steps.ecr.outputs.registry }}"
+          echo "tag=${TAG}"                               >> "$GITHUB_OUTPUT"
+          echo "backend=${R}/insightflow/backend:${TAG}"  >> "$GITHUB_OUTPUT"
+          echo "frontend=${R}/insightflow/frontend:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "etl=${R}/insightflow/etl:${TAG}"          >> "$GITHUB_OUTPUT"
 
-            CMD_ID=$(aws ssm send-command \
-              --instance-ids "$INSTANCE" \
-              --document-name "AWS-RunShellScript" \
-              --parameters "file:///tmp/ssm-params.json" \
-              --output text --query "Command.CommandId")
+      - uses: docker/setup-buildx-action@v3
 
-            "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" "$timeout"
-          }
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.backend }}
+            ${{ steps.ecr.outputs.registry }}/insightflow/backend:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=registry,ref=${{ steps.ecr.outputs.registry }}/insightflow/backend:latest
+          cache-to:   type=inline
+          provenance: false
 
-          ssm_upload docker-compose.yml          /opt/insightflow/docker-compose.yml 60
-          ssm_upload "${{ env.ENV_CONFIG }}"     /tmp/deploy.env                     30
-          ssm_upload "${{ env.DEPLOY_SCRIPT }}"  /tmp/deploy.sh                      30
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.frontend }}
+            ${{ steps.ecr.outputs.registry }}/insightflow/frontend:latest
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=registry,ref=${{ steps.ecr.outputs.registry }}/insightflow/frontend:latest
+          cache-to:   type=inline
+          provenance: false
 
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE" \
-            --document-name "AWS-RunShellScript" \
-            --parameters '{"commands":["chmod +x /tmp/deploy.sh"]}' \
-            --output text --query "Command.CommandId")
-          "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" 15
+      - name: Build & push ETL
+        uses: docker/build-push-action@v6
+        with:
+          context: ./data-engineering
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.etl }}
+            ${{ steps.ecr.outputs.registry }}/insightflow/etl:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=registry,ref=${{ steps.ecr.outputs.registry }}/insightflow/etl:latest
+          cache-to:   type=inline
+          provenance: false
 
-      # Build on EC2 + canary pre-flight + zero-downtime swap + auto-rollback
-      - name: Run zero-downtime deploy via SSM
-        id: ssm_deploy
-        env:
-          INSTANCE:   ${{ secrets.PROD_EC2_INSTANCE_ID }}
-          COMMIT_SHA: ${{ github.sha }}
-          REPO_URL:   https://github.com/${{ github.repository }}.git
+  # ── Database migrations ───────────────────────────────────────────────────────
+  # One-shot ECS Fargate task: runs `python manage.py migrate --noinput` and exits.
+  # Runs before services are updated so the schema is always ahead of the code.
+  migrate:
+    name: Run DB migrations
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Load environment config
         run: |
-          TIMEOUT=$(grep '^DEPLOY_TIMEOUT=' "${{ env.ENV_CONFIG }}" | cut -d= -f2 | cut -d'#' -f1 | tr -d '[:space:]')
+          grep -v '^\s*#' "${{ env.ENV_CONFIG }}" | grep -v '^\s*$' >> "$GITHUB_ENV"
 
-          python3 -c "
-          import json, os
-          cmd = ' '.join([
-              f'COMMIT_SHA={os.environ[\"COMMIT_SHA\"]}',
-              f'GITHUB_REPO_URL={os.environ[\"REPO_URL\"]}',
-              'bash /tmp/deploy.sh',
-          ])
-          print(json.dumps({'commands': [cmd]}))
-          " > /tmp/ssm-deploy.json
+      - name: Prepare and register migration task definition
+        id: migration_td
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE" \
-            --document-name "AWS-RunShellScript" \
-            --parameters "file:///tmp/ssm-deploy.json" \
-            --output text --query "Command.CommandId")
+          sed \
+            -e "s|ACCOUNT_ID|${ACCOUNT_ID}|g" \
+            -e "s|AWS_REGION|${{ env.AWS_REGION }}|g" \
+            devops/ecs/task-definitions/migration.json \
+          | python3 -c "
+          import json, sys
+          td = json.load(sys.stdin)
+          td['containerDefinitions'][0]['image'] = '${{ needs.build.outputs.backend_image }}'
+          print(json.dumps(td))
+          " > /tmp/migration-task-def.json
 
-          echo "SSM Command ID: $CMD_ID"
-          "${{ env.SSM_WAIT }}" "$CMD_ID" "$INSTANCE" "$TIMEOUT"
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file:///tmp/migration-task-def.json" \
+            --query "taskDefinition.taskDefinitionArn" --output text)
+          echo "arn=${ARN}" >> "$GITHUB_OUTPUT"
+          echo "Registered migration task: ${ARN}"
 
-      # End-to-end validation through the ALB (HTTPS in prod)
-      - name: Smoke test via ALB
+      - name: Run migration task and wait
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --task-definition "${{ steps.migration_td.outputs.arn }}" \
+            --launch-type FARGATE \
+            --network-configuration \
+              "awsvpcConfiguration={subnets=[${{ secrets.PROD_PRIVATE_SUBNET_IDS }}],securityGroups=[${{ secrets.PROD_ECS_SG_ID }}],assignPublicIp=DISABLED}" \
+            --query "tasks[0].taskArn" --output text)
+
+          echo "Migration task: ${TASK_ARN}"
+          aws ecs wait tasks-stopped --cluster "${{ env.ECS_CLUSTER }}" --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --tasks   "$TASK_ARN" \
+            --query   "tasks[0].containers[0].exitCode" --output text)
+
+          if [[ "$EXIT_CODE" != "0" ]]; then
+            echo "Migration failed (exit ${EXIT_CODE})"
+            aws ecs describe-tasks \
+              --cluster "${{ env.ECS_CLUSTER }}" \
+              --tasks   "$TASK_ARN" \
+              --query   "tasks[0].stoppedReason" --output text
+            exit 1
+          fi
+          echo "Migrations completed successfully"
+
+  # ── Deploy ECS services ───────────────────────────────────────────────────────
+  # Standard pattern per service:
+  #   1. Substitute ACCOUNT_ID + AWS_REGION in the task definition template
+  #   2. amazon-ecs-render-task-definition writes the new container image
+  #   3. amazon-ecs-deploy-task-definition registers the revision and updates the service
+  deploy:
+    name: Deploy ECS services
+    runs-on: ubuntu-latest
+    needs: [build, migrate]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Load environment config
+        run: |
+          grep -v '^\s*#' "${{ env.ENV_CONFIG }}" | grep -v '^\s*$' >> "$GITHUB_ENV"
+
+      - name: Prepare task definitions (substitute ACCOUNT_ID + AWS_REGION)
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          for SVC in backend celery-worker frontend etl-listener etl-worker; do
+            sed \
+              -e "s|ACCOUNT_ID|${ACCOUNT_ID}|g" \
+              -e "s|AWS_REGION|${{ env.AWS_REGION }}|g" \
+              "devops/ecs/task-definitions/${SVC}.json" \
+              > "/tmp/${SVC}-task-def.json"
+          done
+
+      # ── Backend ──────────────────────────────────────────────────────────────
+      - name: Render backend task definition
+        id: backend_td
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/backend-task-def.json
+          container-name:  ${{ env.ECS_BACKEND_CONTAINER }}
+          image:           ${{ needs.build.outputs.backend_image }}
+
+      - name: Deploy backend
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:            ${{ steps.backend_td.outputs.task-definition }}
+          service:                    ${{ env.ECS_BACKEND_SERVICE }}
+          cluster:                    ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      # ── Celery worker ─────────────────────────────────────────────────────────
+      - name: Render celery-worker task definition
+        id: celery_td
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/celery-worker-task-def.json
+          container-name:  ${{ env.ECS_CELERY_CONTAINER }}
+          image:           ${{ needs.build.outputs.backend_image }}
+
+      - name: Deploy celery-worker
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:            ${{ steps.celery_td.outputs.task-definition }}
+          service:                    ${{ env.ECS_CELERY_SERVICE }}
+          cluster:                    ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      # ── Frontend ─────────────────────────────────────────────────────────────
+      - name: Render frontend task definition
+        id: frontend_td
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/frontend-task-def.json
+          container-name:  ${{ env.ECS_FRONTEND_CONTAINER }}
+          image:           ${{ needs.build.outputs.frontend_image }}
+
+      - name: Deploy frontend
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:            ${{ steps.frontend_td.outputs.task-definition }}
+          service:                    ${{ env.ECS_FRONTEND_SERVICE }}
+          cluster:                    ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      # ── ETL listener ─────────────────────────────────────────────────────────
+      - name: Render etl-listener task definition
+        id: etl_listener_td
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/etl-listener-task-def.json
+          container-name:  ${{ env.ECS_ETL_LISTENER_CONTAINER }}
+          image:           ${{ needs.build.outputs.etl_image }}
+
+      - name: Deploy etl-listener
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:            ${{ steps.etl_listener_td.outputs.task-definition }}
+          service:                    ${{ env.ECS_ETL_LISTENER_SERVICE }}
+          cluster:                    ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      # ── ETL worker ───────────────────────────────────────────────────────────
+      - name: Render etl-worker task definition
+        id: etl_worker_td
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/etl-worker-task-def.json
+          container-name:  ${{ env.ECS_ETL_WORKER_CONTAINER }}
+          image:           ${{ needs.build.outputs.etl_image }}
+
+      - name: Deploy etl-worker
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:            ${{ steps.etl_worker_td.outputs.task-definition }}
+          service:                    ${{ env.ECS_ETL_WORKER_SERVICE }}
+          cluster:                    ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  # ── Smoke test ────────────────────────────────────────────────────────────────
+  smoke-test:
+    name: Smoke test via ALB
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Health check
         run: |
           ALB="${{ secrets.PROD_ALB_DNS_NAME }}"
-          for i in $(seq 1 18); do
+          for i in $(seq 1 24); do
             HTTP=$(curl -sf -o /dev/null -w "%{http_code}" \
-              --max-time 10 "https://$ALB/api-docs/" 2>/dev/null || echo "000")
-            echo "[$i/18] ALB → HTTP $HTTP"
+              --max-time 10 "http://${ALB}/api-docs/" 2>/dev/null || echo "000")
+            echo "[$i/24] ALB → HTTP ${HTTP}"
             if [[ "$HTTP" == "200" ]]; then echo "Smoke test passed"; exit 0; fi
             sleep 10
           done
-          echo "Smoke test failed — check CloudWatch Logs"
+          echo "Smoke test failed — check ECS service events and CloudWatch Logs"
           exit 1
-
-      - name: Record deployment metric and event
-        if: always()
-        run: |
-          STATUS="${{ job.status }}"
-          TS=$(date -u +%s)
-
-          DIMS="Dimensions=[{Name=Environment,Value=prod},{Name=Status,Value=${STATUS}}]"
-          aws cloudwatch put-metric-data \
-            --namespace "InsightFlow/Deployments" \
-            --metric-data "MetricName=DeploymentCount,Value=1,Unit=Count,${DIMS}" \
-            --region "${{ env.AWS_REGION }}" || true
-
-          EVENT="{\"sha\":\"${{ github.sha }}\",\"status\":\"${STATUS}\",\"run\":\"${{ github.run_id }}\"}"
-          aws logs put-log-events \
-            --log-group-name  "/insightflow/prod/deployments" \
-            --log-stream-name "github-actions" \
-            --log-events      "timestamp=$(( TS * 1000 )),message=${EVENT}" \
-            --region "${{ env.AWS_REGION }}" 2>/dev/null || true
 
   # ── Summary ───────────────────────────────────────────────────────────────────
   summary:
     name: Deployment summary
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [build, smoke-test]
     if: always()
     steps:
       - name: Write job summary
         run: |
-          STATUS="${{ needs.deploy.result }}"
+          STATUS="${{ needs.smoke-test.result }}"
           [[ "$STATUS" == "success" ]] && ICON="✅" || ICON="❌"
           cat >> "$GITHUB_STEP_SUMMARY" << EOF
-          ## ${ICON} Prod Deployment — ${STATUS}
+          ## ${ICON} Prod Deployment (ECS Fargate) — ${STATUS}
 
-          | Field       | Value |
-          |-------------|-------|
-          | **Commit**  | \`${{ github.sha }}\` |
-          | **Branch**  | \`main\` |
+          | Field         | Value |
+          |---------------|-------|
+          | **Commit**    | \`${{ github.sha }}\` |
+          | **Image tag** | \`${{ needs.build.outputs.image_tag }}\` |
+          | **Backend**   | \`${{ needs.build.outputs.backend_image }}\` |
+          | **Frontend**  | \`${{ needs.build.outputs.frontend_image }}\` |
+          | **ETL**       | \`${{ needs.build.outputs.etl_image }}\` |
           | **Pushed by** | ${{ github.actor }} |
-          | **Build**   | on EC2 — no container registry |
-          | **Run**     | [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
-          | **ALB**     | https://${{ secrets.PROD_ALB_DNS_NAME }} |
+          | **Run**       | [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | **ALB**       | http://${{ secrets.PROD_ALB_DNS_NAME }} |
           EOF
