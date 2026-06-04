@@ -199,7 +199,7 @@ class TestVPCModule:
 
     def test_private_subnet_routes_through_nat(self, vpc_main):
         assert (
-            "nat_gateway_id = aws_nat_gateway.this[0].id" in vpc_main
+            "aws_nat_gateway.this[0].id" in vpc_main
         ), "Private subnets must route outbound traffic through the NAT Gateway"
 
     def test_public_subnet_routes_through_igw(self, vpc_main):

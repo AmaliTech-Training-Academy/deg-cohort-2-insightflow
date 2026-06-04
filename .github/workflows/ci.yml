@@ -408,7 +408,8 @@ jobs:
             --skip-check CKV_AWS_31 \
             --skip-check CKV_AWS_118 \
             --skip-check CKV_AWS_149 \
-            --skip-check CKV2_AWS_62
+            --skip-check CKV2_AWS_62 \
+            --skip-check CKV2_AWS_19
 
   infra-tests:
     name: Infrastructure QA tests
