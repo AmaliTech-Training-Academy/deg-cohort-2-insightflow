@@ -249,5 +249,6 @@ volumes:
   pgdata-warehouse:
   redis-data:
   media-data:
+  metabase-data:
   postgres-app-data:
   postgres-warehouse-data:
