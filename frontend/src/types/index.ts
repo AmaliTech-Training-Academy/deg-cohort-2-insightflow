@@ -16,7 +16,9 @@ export interface IngestionJob {
   sourceType: SourceType;
   status: IngestionStatus;
   recordsTotal: number | null;
-  recordsProcessed: number | null;
+  recordsProcessed: number | null;  // valid_rows — successfully inserted
+  rejectedRows?: number;            // FK misses (unknown store / cashier / product)
+  errorRows?: number;               // bad CSV format rows
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;

@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 md:px-6 h-12 flex items-center justify-between shrink-0">
+        <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 md:px-6 lg:px-8 h-12 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
               className="md:hidden p-1.5 -ml-1 rounded-md text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors shrink-0"
@@ -37,8 +37,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ThemeToggle />
         </header>
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-slate-950">
-          {children}
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-950">
+          <div className="px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
+            {children}
+          </div>
         </main>
       </div>
     </div>
