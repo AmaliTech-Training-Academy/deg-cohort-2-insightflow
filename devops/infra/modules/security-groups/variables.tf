@@ -18,6 +18,12 @@ variable "enable_ssh" {
   default     = false
 }
 
+variable "enable_ecs" {
+  description = "Create a dedicated ECS tasks security group and open RDS/Redis inbound from it. Set true in any environment running ECS Fargate."
+  type        = bool
+  default     = false
+}
+
 
 variable "allow_public_db_access" {
   description = "Open RDS port 5432 to the internet. Dev only — lets developers connect directly with just the endpoint URL."
