@@ -59,23 +59,16 @@ module "security_groups" {
   name       = local.name
   vpc_id     = module.vpc.vpc_id
   enable_alb = true
-  enable_ssh = false # no SSH in prod — use SSM Session Manager
+  enable_ecs = true  # creates ecs SG and opens RDS/Redis inbound from it
+  enable_ssh = false # no shell access to compute in prod
   tags       = local.common_tags
 }
 
-# ── EC2 ───────────────────────────────────────────────────────────────────────
-module "ec2" {
-  source             = "../../modules/ec2"
-  name               = local.name
-  region             = var.region
-  subnet_id          = module.vpc.private_subnet_a_id
-  security_group_id  = module.security_groups.ec2_sg_id
-  instance_type      = "t3.medium"
-  root_volume_gb     = 30
-  enable_public_ip   = false # prod: SSM-only access through NAT GW
-  s3_bucket_name     = module.s3.bucket_name
-  log_retention_days = 30
-  tags               = local.common_tags
+# ── ECR — container image repositories ───────────────────────────────────────
+module "ecr" {
+  source         = "../../modules/ecr"
+  images_to_keep = 10
+  tags           = local.common_tags
 }
 
 # ── ElastiCache Redis ─────────────────────────────────────────────────────────
@@ -85,9 +78,9 @@ module "redis" {
   private_subnet_ids      = module.vpc.private_subnet_ids
   redis_security_group_id = module.security_groups.redis_sg_id
   node_type               = "cache.t3.small"
-  transit_encryption_mode = "required" # enforce TLS in prod
-  snapshot_retention_days = 1          # daily snapshot for prod
-  apply_immediately       = false      # wait for maintenance window in prod
+  transit_encryption_mode = "required"
+  snapshot_retention_days = 1
+  apply_immediately       = false
   tags                    = local.common_tags
 }
 
@@ -102,7 +95,6 @@ module "rds" {
   app_db_password       = var.app_db_password
   warehouse_db_password = var.warehouse_db_password
 
-  # Prod: deletion protection on, 7-day backups, enhanced monitoring
   multi_az                    = false
   skip_final_snapshot         = false
   deletion_protection         = true
@@ -113,17 +105,65 @@ module "rds" {
   tags = local.common_tags
 }
 
-# ── ALB + WAF ─────────────────────────────────────────────────────────────────
+# ── ALB ───────────────────────────────────────────────────────────────────────
+# No ec2_instance_id — ECS mode: the ECS module creates IP-based target groups
+# and listener rules; the ALB module just provides the load balancer and listener.
 module "alb" {
   source                     = "../../modules/alb"
   name                       = local.name
   vpc_id                     = module.vpc.vpc_id
   public_subnet_ids          = module.vpc.public_subnet_ids
   alb_security_group_id      = module.security_groups.alb_sg_id
-  ec2_instance_id            = module.ec2.instance_id
-  enable_https               = true # enforce TLS in prod
-  enable_deletion_protection = true # prevent accidental ALB deletion in prod
-  acm_certificate_arn        = var.acm_certificate_arn
+  enable_https               = false
+  enable_deletion_protection = true
   enable_waf                 = true
   tags                       = local.common_tags
+}
+
+# ── ECS Fargate — application cluster ────────────────────────────────────────
+module "ecs" {
+  source = "../../modules/ecs"
+
+  name   = local.name
+  region = var.region
+
+  # Network
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  # Security: ECS tasks SG is owned by the security-groups module
+  # (enable_ecs = true) so it can also open RDS/Redis inbound from it.
+  tasks_sg_id = module.security_groups.ecs_sg_id
+
+  # ALB integration — ECS attaches its own IP-based target groups to this listener
+  alb_listener_arn = module.alb.http_listener_arn
+
+  # Secrets Manager ARNs for container secret injection
+  app_db_secret_arn       = module.rds.app_db_secret_arn
+  warehouse_db_secret_arn = module.rds.warehouse_db_secret_arn
+  redis_secret_arn        = module.redis.secret_arn
+
+  # S3 for media uploads
+  s3_bucket_name = module.s3.bucket_name
+
+  # Initial image URIs — CI/CD updates task definitions after first apply
+  backend_image  = "${module.ecr.backend_repository_url}:latest"
+  frontend_image = "${module.ecr.frontend_repository_url}:latest"
+  etl_image      = "${module.ecr.etl_repository_url}:latest"
+
+  # App configuration
+  allowed_hosts        = "*"
+  cors_allowed_origins = var.cors_allowed_origins
+
+  # Sizing
+  backend_cpu     = 512
+  backend_memory  = 1024
+  frontend_cpu    = 256
+  frontend_memory = 512
+  worker_cpu      = 256
+  worker_memory   = 512
+
+  log_retention_days = 30
+
+  tags = local.common_tags
 }

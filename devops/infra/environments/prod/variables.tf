@@ -13,7 +13,9 @@ variable "warehouse_db_password" {
   sensitive = true
 }
 
-variable "acm_certificate_arn" {
-  description = "ARN of an ACM certificate covering your domain (must be in the same region as the ALB)"
+variable "cors_allowed_origins" {
+  description = "Comma-separated list of frontend origins the API will accept (e.g. https://app.example.com)"
   type        = string
+  default     = ""
 }
+
