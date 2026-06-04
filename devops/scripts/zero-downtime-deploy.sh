@@ -105,6 +105,7 @@ fi
 
 if [[ ! -d "${REPO_DIR}/.git" ]]; then
   log "First deploy — cloning ${GITHUB_REPO_URL} → ${REPO_DIR}"
+  rm -rf "$REPO_DIR"
   git "${GIT_OPTS[@]}" clone --filter=blob:none --no-checkout "$GITHUB_REPO_URL" "$REPO_DIR"
 fi
 

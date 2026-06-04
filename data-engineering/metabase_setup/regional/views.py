@@ -51,20 +51,21 @@ GROUP BY g."province"
 ORDER BY avg_satisfaction DESC;
 
 -- Store-based regional comparison
--- Regions are drawn from dimStore.province (the authoritative region source).
--- Sales metrics join factSales → dimStore.
--- Satisfaction / NPS metrics join factFeedback → dimGeography matched by province.
+-- Regions are drawn from dimGeography.province via factSales.geographyKey.
+-- For online orders this is onlineOrder.shippingProvince; for POS it is
+-- store.province. Using the same geography dimension for both sales and
+-- satisfaction ensures the LEFT JOIN produces correct scores.
 CREATE OR REPLACE VIEW v_store_regional_comparison AS
 WITH store_sales AS (
     SELECT
-        COALESCE(st."province", 'Unknown') AS region,
-        SUM(f."netAmount")                 AS revenue,
-        SUM(f."quantity")                  AS units_sold,
-        COUNT(f."salesKey")                AS transactions,
-        COUNT(DISTINCT f."customerKey")    AS unique_customers
+        COALESCE(g."province", 'Unknown') AS region,
+        SUM(f."netAmount")                AS revenue,
+        SUM(f."quantity")                 AS units_sold,
+        COUNT(f."salesKey")               AS transactions,
+        COUNT(DISTINCT f."customerKey")   AS unique_customers
     FROM "factSales" f
-    LEFT JOIN "dimStore" st ON f."storeKey" = st."storeKey"
-    GROUP BY st."province"
+    LEFT JOIN "dimGeography" g ON f."geographyKey" = g."geographyKey"
+    GROUP BY g."province"
 ),
 store_satisfaction AS (
     SELECT
