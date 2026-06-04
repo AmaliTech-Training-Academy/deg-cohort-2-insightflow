@@ -24,7 +24,7 @@ export default defineConfig({
   },
   server: {
     fs: {
-      // Allow serving files from anywhere inside the monorepo root.
+      // Allow serving files from 
       allow: [path.resolve(__dirname, "..")],
     },
   },
