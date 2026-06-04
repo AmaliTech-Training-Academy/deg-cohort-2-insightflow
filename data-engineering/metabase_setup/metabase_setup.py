@@ -10,6 +10,7 @@ from metabase_client import (
     build_tabbed_dashboard,
     clean_up,
     create_filter_value_cards,
+    get_existing_dashboard_id,
     get_or_create_database,
     login,
     set_homepage,
@@ -85,7 +86,16 @@ def main():
     # Connect or create the warehouse database
     database_id = get_or_create_database(session_id)
 
-    # Clean up old dashboards and cards
+    # Check if the dashboard already exists — skip full rebuild if so
+    dashboard_id = get_existing_dashboard_id(session_id)
+    if dashboard_id:
+        logger.info(
+            "Dashboard already exists (ID: %s). Skipping rebuild.", dashboard_id
+        )
+        logger.info("Access it at: %s/dashboard/%s", METABASE_URL, dashboard_id)
+        return
+
+    # First-time build: clean up any stale cards, then create everything fresh
     clean_up(session_id)
 
     # Create filter value cards
