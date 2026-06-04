@@ -164,7 +164,7 @@ class Extractor:
                 i."currentStockQty"             AS "stockQuantity",
                 i."reorderThreshold"            AS "reorderThreshold",
                 i."lastRestockedDate"           AS "lastRestockedDate",
-                (:snapshot_date::date - i."lastRestockedDate")
+                (CAST(:snapshot_date AS date) - i."lastRestockedDate")
                                                 AS "daysSinceRestock",
                 s."storeId"                     AS "storeId",
                 s."storeName"                   AS "storeName",
