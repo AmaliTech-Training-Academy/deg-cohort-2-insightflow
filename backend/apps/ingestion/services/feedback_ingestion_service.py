@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from django.db import transaction as db_transaction
 
@@ -43,7 +44,28 @@ class FeedbackIngestionService:
         to_create: list[FeedbackSurvey] = []
         error_details: list[dict] = []
 
+        today = date.today()
         for r in records:
+            raw_date = r.get("submissionDate")
+            try:
+                submission_date = date.fromisoformat(str(raw_date))
+            except (TypeError, ValueError):
+                error_details.append(
+                    {
+                        "responseId": r.get("responseId"),
+                        "error": f"Invalid submissionDate '{raw_date}'",
+                    }
+                )
+                continue
+            if submission_date > today:
+                error_details.append(
+                    {
+                        "responseId": r.get("responseId"),
+                        "error": f"submissionDate '{raw_date}' is in the future",
+                    }
+                )
+                continue
+
             cust = customers.get(str(r.get("customerId", "")))
             if cust is None:
                 error_details.append(

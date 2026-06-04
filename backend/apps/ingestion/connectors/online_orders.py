@@ -16,7 +16,9 @@ class OnlineOrdersAPIError(Exception):
 
 
 def _base_url() -> str:
-    url = os.environ.get("ONLINE_ORDERS_API_URL", "").rstrip("/")
+    url = os.environ.get(
+        "ONLINE_ORDERS_API_URL", "https://ext-amali.vercel.app"
+    ).rstrip("/")
     if not url:
         raise OnlineOrdersAPIError("ONLINE_ORDERS_API_URL is not configured.")
     return url
