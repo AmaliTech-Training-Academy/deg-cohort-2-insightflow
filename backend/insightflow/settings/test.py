@@ -12,6 +12,8 @@ DATABASES = {
     }
 }
 
+EXTERNAL_API_BASE_URL = "https://ext-amali.vercel.app"
+
 # Speed up password hashing in tests
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
