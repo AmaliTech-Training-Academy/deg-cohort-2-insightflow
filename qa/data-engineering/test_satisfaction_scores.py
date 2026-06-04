@@ -69,9 +69,7 @@ def regional_satisfaction_summary(regions):
                 "nps_score": nps,
                 "promoters": sum(1 for r in rows if r["nps_score"] >= 9),
                 "detractors": sum(1 for r in rows if r["nps_score"] <= 6),
-                "passives": sum(
-                    1 for r in rows if 7 <= r["nps_score"] <= 8
-                ),
+                "passives": sum(1 for r in rows if 7 <= r["nps_score"] <= 8),
                 "below_threshold": is_below_threshold(avg_sat),
             }
         )
@@ -115,12 +113,12 @@ def borderline_rows():
 def mixed_nps_rows():
     return [
         _row(4, 4, 10),  # promoter
-        _row(4, 4, 9),   # promoter
-        _row(3, 3, 7),   # passive
-        _row(3, 3, 8),   # passive
-        _row(2, 2, 5),   # detractor
-        _row(2, 2, 4),   # detractor
-        _row(2, 2, 3),   # detractor
+        _row(4, 4, 9),  # promoter
+        _row(3, 3, 7),  # passive
+        _row(3, 3, 8),  # passive
+        _row(2, 2, 5),  # detractor
+        _row(2, 2, 4),  # detractor
+        _row(2, 2, 3),  # detractor
     ]
 
 
@@ -132,9 +130,7 @@ def mixed_nps_rows():
 class TestSatisfactionMean:
     def test_perfect_scores(self, high_satisfaction_rows):
         result = compute_satisfaction(high_satisfaction_rows)
-        assert result == round(
-            ((5 + 4 + 5) / 3 + (5 + 5 + 4) / 3) / 2, 2
-        )
+        assert result == round(((5 + 4 + 5) / 3 + (5 + 5 + 4) / 3) / 2, 2)
 
     def test_low_scores(self, low_satisfaction_rows):
         result = compute_satisfaction(low_satisfaction_rows)
@@ -187,12 +183,12 @@ class TestNPSFormula:
         assert compute_nps([]) is None
 
     def test_promoter_threshold_is_9(self):
-        assert _row(5, 5, 9)["nps_score"] >= 9   # promoter
+        assert _row(5, 5, 9)["nps_score"] >= 9  # promoter
         assert _row(5, 5, 8)["nps_score"] not in range(9, 11)  # passive
 
     def test_detractor_threshold_is_6(self):
-        assert _row(2, 2, 6)["nps_score"] <= 6   # detractor
-        assert _row(2, 2, 7)["nps_score"] > 6    # passive
+        assert _row(2, 2, 6)["nps_score"] <= 6  # detractor
+        assert _row(2, 2, 7)["nps_score"] > 6  # passive
 
 
 # ---------------------------------------------------------------------------
@@ -242,8 +238,8 @@ class TestRegionalSummary:
 
     def test_below_threshold_regions_flagged_correctly(self):
         regions = {
-            "Kigali": [_row(5, 5, 10)],   # high
-            "Eastern": [_row(2, 2, 4)],   # low
+            "Kigali": [_row(5, 5, 10)],  # high
+            "Eastern": [_row(2, 2, 4)],  # low
         }
         result = {r["region_name"]: r for r in regional_satisfaction_summary(regions)}
         assert result["Kigali"]["below_threshold"] is False

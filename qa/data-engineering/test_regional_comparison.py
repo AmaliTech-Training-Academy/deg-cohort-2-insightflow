@@ -32,8 +32,7 @@ def aggregate_regions(sales_rows, feedback_rows):
     from collections import defaultdict
 
     sales = defaultdict(
-        lambda: {"revenue": 0, "units_sold": 0, "transactions": 0,
-                 "customers": set()}
+        lambda: {"revenue": 0, "units_sold": 0, "transactions": 0, "customers": set()}
     )
     for row in sales_rows:
         region = row.get("province") or "Unknown"
@@ -64,9 +63,7 @@ def aggregate_regions(sales_rows, feedback_rows):
         s = sales[region]
         f = feedback[region]
         avg_sat = (
-            round(sum(f["ratings"]) / len(f["ratings"]), 2)
-            if f["ratings"]
-            else None
+            round(sum(f["ratings"]) / len(f["ratings"]), 2) if f["ratings"] else None
         )
         result.append(
             {
@@ -150,9 +147,9 @@ def _feedback(province, product_rating, delivery_rating, nps_score):
 @pytest.fixture
 def sales_data():
     return [
-        _sale("Kigali",   5000, 50, "C1"),
-        _sale("Kigali",   3000, 30, "C2"),
-        _sale("Eastern",  2000, 20, "C3"),
+        _sale("Kigali", 5000, 50, "C1"),
+        _sale("Kigali", 3000, 30, "C2"),
+        _sale("Eastern", 2000, 20, "C3"),
         _sale("Northern", 1000, 10, "C1"),
     ]
 
@@ -160,9 +157,9 @@ def sales_data():
 @pytest.fixture
 def feedback_data():
     return [
-        _feedback("Kigali",   5, 4, 10),
-        _feedback("Kigali",   4, 5, 9),
-        _feedback("Eastern",  3, 2, 5),
+        _feedback("Kigali", 5, 4, 10),
+        _feedback("Kigali", 4, 5, 9),
+        _feedback("Eastern", 3, 2, 5),
         _feedback("Northern", 4, 4, 7),
     ]
 
@@ -219,7 +216,7 @@ class TestRegionAggregation:
     def test_unknown_province_grouped_together(self):
         sales = [
             _sale(None, 1000, 10, "C1"),
-            _sale(None, 500,  5,  "C2"),
+            _sale(None, 500, 5, "C2"),
         ]
         result = aggregate_regions(sales, [])
         assert len(result) == 1
@@ -229,9 +226,13 @@ class TestRegionAggregation:
     def test_required_columns_present(self, aggregated):
         for row in aggregated:
             for col in (
-                "region", "revenue", "units_sold",
-                "transactions", "unique_customers",
-                "avg_satisfaction", "nps_score",
+                "region",
+                "revenue",
+                "units_sold",
+                "transactions",
+                "unique_customers",
+                "avg_satisfaction",
+                "nps_score",
             ):
                 assert col in row
 

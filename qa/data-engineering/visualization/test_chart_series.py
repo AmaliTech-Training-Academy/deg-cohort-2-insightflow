@@ -16,9 +16,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 import pytest
-
 from metabase_setup.chart_generator import build_series, generate_chart
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -111,8 +109,11 @@ class TestMissingDates:
         single_date = dates[5]
         channel = _channel_map([("In-Store", single_date, 500)])
         series = build_series(dates, channel)
-        zeros = [v for i, v in enumerate(series["in_store"])
-                 if series["dates"][i] != single_date]
+        zeros = [
+            v
+            for i, v in enumerate(series["in_store"])
+            if series["dates"][i] != single_date
+        ]
         assert all(v == 0.0 for v in zeros)
 
     def test_present_date_has_correct_revenue(self):
@@ -171,11 +172,13 @@ class TestChannelRouting:
     def test_multiple_channels_aggregated_correctly(self):
         dates = _last_30_days()
         d = dates[0]
-        channel = _channel_map([
-            ("In-Store", d, 400),
-            ("POS",      d, 200),   # also in-store
-            ("online",   d, 300),
-        ])
+        channel = _channel_map(
+            [
+                ("In-Store", d, 400),
+                ("POS", d, 200),  # also in-store
+                ("online", d, 300),
+            ]
+        )
         series = build_series(dates, channel)
         assert series["in_store"][0] == 600.0
         assert series["online"][0] == 300.0
@@ -200,10 +203,12 @@ class TestPNGExport:
     def _make_series(self):
         dates = _last_30_days()
         d = dates[15]
-        channel = _channel_map([
-            ("In-Store", d, 5000),
-            ("online",   d, 3000),
-        ])
+        channel = _channel_map(
+            [
+                ("In-Store", d, 5000),
+                ("online", d, 3000),
+            ]
+        )
         return build_series(dates, channel)
 
     def test_returns_bytes(self):

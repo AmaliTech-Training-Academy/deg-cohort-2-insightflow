@@ -46,13 +46,9 @@ def fetch_series(conn) -> dict[str, Any]:
         }
     """
     cutoff = date.today() - timedelta(days=30)
-    all_dates = sorted(
-        cutoff + timedelta(days=i) for i in range(31)
-    )
+    all_dates = sorted(cutoff + timedelta(days=i) for i in range(31))
 
-    by_channel: dict[str, dict[date, float]] = defaultdict(
-        lambda: defaultdict(float)
-    )
+    by_channel: dict[str, dict[date, float]] = defaultdict(lambda: defaultdict(float))
 
     with conn.cursor() as cur:
         cur.execute(SQL_DAILY_REVENUE_BY_CHANNEL)
@@ -117,9 +113,10 @@ def generate_chart(series: dict[str, Any], output_path: str | None = None) -> by
         PNG image as bytes (suitable for HTTP response or file write).
     """
     import matplotlib
+
     matplotlib.use("Agg")  # non-interactive backend — no display required
-    import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
 
     dates = series["dates"]
     in_store = series["in_store"]
@@ -127,10 +124,24 @@ def generate_chart(series: dict[str, Any], output_path: str | None = None) -> by
 
     fig, ax = plt.subplots(figsize=(12, 5))
 
-    ax.plot(dates, in_store, label="In-Store", color="#2563EB",
-            linewidth=2, marker="o", markersize=4)
-    ax.plot(dates, online, label="Online",   color="#16A34A",
-            linewidth=2, marker="s", markersize=4)
+    ax.plot(
+        dates,
+        in_store,
+        label="In-Store",
+        color="#2563EB",
+        linewidth=2,
+        marker="o",
+        markersize=4,
+    )
+    ax.plot(
+        dates,
+        online,
+        label="Online",
+        color="#16A34A",
+        linewidth=2,
+        marker="s",
+        markersize=4,
+    )
 
     ax.set_title("Daily Revenue — Last 30 Days", fontsize=14, fontweight="bold")
     ax.set_xlabel("Date")

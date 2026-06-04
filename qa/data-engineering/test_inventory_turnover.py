@@ -1,4 +1,3 @@
-
 import pytest
 
 DEFAULT_THRESHOLD = 2.0
@@ -65,9 +64,9 @@ def category_turnover_summary(categories, threshold=DEFAULT_THRESHOLD):
 @pytest.fixture
 def healthy_categories():
     return {
-        "Electronics": {"units_sold": 500, "avg_inventory": 100},   # 5.0
-        "Clothing": {"units_sold": 300, "avg_inventory": 100},      # 3.0
-        "Food": {"units_sold": 800, "avg_inventory": 200},          # 4.0
+        "Electronics": {"units_sold": 500, "avg_inventory": 100},  # 5.0
+        "Clothing": {"units_sold": 300, "avg_inventory": 100},  # 3.0
+        "Food": {"units_sold": 800, "avg_inventory": 200},  # 4.0
     }
 
 
@@ -75,9 +74,9 @@ def healthy_categories():
 def mixed_categories():
     return {
         "Electronics": {"units_sold": 500, "avg_inventory": 100},  # 5.0 OK
-        "Clothing": {"units_sold": 100, "avg_inventory": 200},     # 0.5 LOW
-        "Food": {"units_sold": 200, "avg_inventory": 100},         # 2.0 edge
-        "Furniture": {"units_sold": 50, "avg_inventory": 500},     # 0.1 LOW
+        "Clothing": {"units_sold": 100, "avg_inventory": 200},  # 0.5 LOW
+        "Food": {"units_sold": 200, "avg_inventory": 100},  # 2.0 edge
+        "Furniture": {"units_sold": 50, "avg_inventory": 500},  # 0.1 LOW
     }
 
 
@@ -159,20 +158,14 @@ class TestCategorySummary:
         assert valid == sorted(valid)
 
     def test_below_threshold_categories_flagged(self, mixed_categories):
-        result = {
-            r["category"]: r
-            for r in category_turnover_summary(mixed_categories)
-        }
+        result = {r["category"]: r for r in category_turnover_summary(mixed_categories)}
         assert result["Electronics"]["below_threshold"] is False  # 5.0
-        assert result["Clothing"]["below_threshold"] is True      # 0.5
-        assert result["Furniture"]["below_threshold"] is True     # 0.1
+        assert result["Clothing"]["below_threshold"] is True  # 0.5
+        assert result["Furniture"]["below_threshold"] is True  # 0.1
 
     def test_exact_threshold_boundary_not_flagged(self, mixed_categories):
         # Food: 200/100 = 2.0 == threshold → NOT flagged
-        result = {
-            r["category"]: r
-            for r in category_turnover_summary(mixed_categories)
-        }
+        result = {r["category"]: r for r in category_turnover_summary(mixed_categories)}
         assert result["Food"]["below_threshold"] is False
 
     def test_all_healthy_none_flagged(self, healthy_categories):
