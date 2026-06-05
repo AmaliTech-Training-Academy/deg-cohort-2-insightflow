@@ -24,7 +24,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group":         "/insightflow/prod/etl-listener",
+          "awslogs-group":         "/ecs/insightflow-prod/etl-listener",
           "awslogs-region":        "AWS_REGION",
           "awslogs-stream-prefix": "etl-listener"
         }

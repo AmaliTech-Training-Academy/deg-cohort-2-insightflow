@@ -27,7 +27,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group":         "/insightflow/prod/migration",
+          "awslogs-group":         "/ecs/insightflow-prod/migration",
           "awslogs-region":        "AWS_REGION",
           "awslogs-stream-prefix": "migration"
         }
