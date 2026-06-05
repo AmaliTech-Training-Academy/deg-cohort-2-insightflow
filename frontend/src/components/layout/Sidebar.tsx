@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { getIngestionHistory } from "@/api/history";
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
-  badge?: string;
   external?: boolean;
 }
 
@@ -23,7 +24,7 @@ const NAV: NavSection[] = [
     items: [
       { href: "/dashboard",       label: "Dashboard",         icon: <DashboardIcon /> },
       { href: "/uploads/new",     label: "New upload",        icon: <UploadIcon /> },
-      { href: "/uploads/history", label: "Ingestion history", icon: <HistoryIcon />, badge: "64" },
+      { href: "/uploads/history", label: "Ingestion history", icon: <HistoryIcon /> },
     ],
   },
   {
@@ -42,6 +43,13 @@ interface SidebarProps {
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+
+  const { data: historyMeta } = useQuery({
+    queryKey: ["ingestion-history", 1],
+    queryFn: () => getIngestionHistory(1),
+    staleTime: 60_000,
+  });
+  const totalJobs = historyMeta?.count;
 
   function isActive(href: string) {
     if (href === "#") return false;
@@ -113,9 +121,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                       {item.icon}
                     </span>
                     <span className="flex-1">{item.label}</span>
-                    {item.badge && (
+                    {item.href === "/uploads/history" && totalJobs != null && (
                       <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400">
-                        {item.badge}
+                        {totalJobs > 999 ? "999+" : totalJobs}
                       </span>
                     )}
                   </>

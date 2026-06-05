@@ -259,6 +259,20 @@ class POSIngestionService:
                         txn_objects, ignore_conflicts=True
                     )
 
+                # Early exit: every valid row was already in the DB — nothing to insert
+                if skipped_count >= len(valid_df) - db_rejected_count:
+                    report: dict = {}
+                    if row_errors:
+                        report["row_errors"] = row_errors
+                    report["skipped_duplicates"] = skipped_count
+                    job.status = InjectionJob.StatusChoices.COMPLETED
+                    job.valid_rows = 0
+                    job.rejected_rows = db_rejected_count
+                    job.error_rows = len(invalid_df)
+                    job.error_report = report
+                    job.save()
+                    return
+
                 # Build ALL PosTransactionLine objects — zero DB calls
                 all_line_records: list = []
                 for txn_id, txn_data in transactions_map.items():
@@ -313,7 +327,7 @@ class POSIngestionService:
                 job.valid_rows = len(valid_df) - db_rejected_count - skipped_count
                 job.rejected_rows = db_rejected_count
                 job.error_rows = len(invalid_df)
-                report: dict = {}
+                report = {}
                 if row_errors:
                     report["row_errors"] = row_errors
                 if skipped_count > 0:
