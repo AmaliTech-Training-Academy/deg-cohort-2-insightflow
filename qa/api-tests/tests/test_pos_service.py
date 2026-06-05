@@ -430,6 +430,10 @@ class TestPOSIngestionServiceProcessJob:
                 return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
             ),
             patch(
+                "apps.ingestion.services.csv_services.PosTransaction.objects.filter",
+                return_value=MagicMock(values_list=MagicMock(return_value=[])),
+            ),
+            patch(
                 "apps.ingestion.services.csv_services"
                 ".PosTransaction.objects.bulk_create"
             ),
@@ -469,6 +473,10 @@ class TestPOSIngestionServiceProcessJob:
                 return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
             ),
             patch(
+                "apps.ingestion.services.csv_services.PosTransaction.objects.filter",
+                return_value=MagicMock(values_list=MagicMock(return_value=[])),
+            ),
+            patch(
                 "apps.ingestion.services.csv_services"
                 ".PosTransaction.objects.bulk_create"
             ) as mock_txn_bulk,
@@ -506,6 +514,10 @@ class TestPOSIngestionServiceProcessJob:
             patch(
                 "apps.ingestion.services.csv_services.Product.objects.values_list",
                 return_value=["PROD-0000001", "PROD-0000002", "PROD-0000003"],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.PosTransaction.objects.filter",
+                return_value=MagicMock(values_list=MagicMock(return_value=[])),
             ),
             patch(
                 "apps.ingestion.services.csv_services"
@@ -586,6 +598,10 @@ class TestPOSIngestionServiceProcessJob:
             patch(
                 "apps.ingestion.services.csv_services.Product.objects.values_list",
                 return_value=[],
+            ),
+            patch(
+                "apps.ingestion.services.csv_services.PosTransaction.objects.filter",
+                return_value=MagicMock(values_list=MagicMock(return_value=[])),
             ),
             patch(
                 "apps.ingestion.services.csv_services"
