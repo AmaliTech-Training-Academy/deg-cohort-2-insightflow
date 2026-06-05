@@ -235,12 +235,43 @@ class POSIngestionService:
                         )
                     )
 
+                # Detect already-existing transactions before inserting so we can
+                # report them as skipped rather than counting them as newly inserted.
+                incoming_txn_ids = {int(obj.posTransactionId) for obj in txn_objects}
+                existing_txn_ids: set[int] = set()
+                if incoming_txn_ids:
+                    existing_txn_ids = set(
+                        PosTransaction.objects.filter(
+                            posTransactionId__in=incoming_txn_ids
+                        ).values_list("posTransactionId", flat=True)
+                    )
+
+                skipped_count = sum(
+                    len(transactions_map[txn_id]["lines"])
+                    for txn_id in transactions_map
+                    if int(txn_id) in existing_txn_ids
+                )
+
                 # ONE bulk_create for ALL transactions
                 # ignore_conflicts=True makes re-uploads idempotent
                 if txn_objects:
                     PosTransaction.objects.bulk_create(
                         txn_objects, ignore_conflicts=True
                     )
+
+                # Early exit: every valid row was already in the DB — nothing to insert
+                if skipped_count >= len(valid_df) - db_rejected_count:
+                    report: dict = {}
+                    if row_errors:
+                        report["row_errors"] = row_errors
+                    report["skipped_duplicates"] = skipped_count
+                    job.status = InjectionJob.StatusChoices.COMPLETED
+                    job.valid_rows = 0
+                    job.rejected_rows = db_rejected_count
+                    job.error_rows = len(invalid_df)
+                    job.error_report = report
+                    job.save()
+                    return
 
                 # Build ALL PosTransactionLine objects — zero DB calls
                 all_line_records: list = []
@@ -293,10 +324,15 @@ class POSIngestionService:
                     )
 
                 job.status = InjectionJob.StatusChoices.COMPLETED
-                job.valid_rows = len(valid_df) - db_rejected_count
+                job.valid_rows = len(valid_df) - db_rejected_count - skipped_count
                 job.rejected_rows = db_rejected_count
                 job.error_rows = len(invalid_df)
-                job.error_report = {"row_errors": row_errors} if row_errors else {}
+                report = {}
+                if row_errors:
+                    report["row_errors"] = row_errors
+                if skipped_count > 0:
+                    report["skipped_duplicates"] = skipped_count
+                job.error_report = report or {}
                 job.save()
 
             logger.info(
