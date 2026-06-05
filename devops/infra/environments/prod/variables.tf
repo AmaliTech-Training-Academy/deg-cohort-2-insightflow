@@ -13,7 +13,14 @@ variable "warehouse_db_password" {
   sensitive = true
 }
 
-variable "acm_certificate_arn" {
-  description = "ARN of an ACM certificate covering your domain (must be in the same region as the ALB)"
+variable "redis_url" {
+  description = "Aiven Cloud Redis connection URL (rediss://...)"
   type        = string
+  sensitive   = true
+}
+
+variable "cors_allowed_origins" {
+  description = "Comma-separated frontend origins the API will accept"
+  type        = string
+  default     = ""
 }

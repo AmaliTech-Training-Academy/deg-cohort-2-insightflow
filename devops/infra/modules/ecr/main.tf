@@ -6,8 +6,9 @@ terraform {
 
 locals {
   repos = {
-    backend = "insightflow/backend"
-    etl     = "insightflow/etl"
+    backend  = "insightflow/backend"
+    frontend = "insightflow/frontend"
+    etl      = "insightflow/etl"
   }
 }
 
