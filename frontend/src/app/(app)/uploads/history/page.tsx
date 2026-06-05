@@ -73,7 +73,7 @@ export default function UploadHistoryPage() {
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Ingestion history</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">Ingestion history</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             All ingestion jobs — click a row to see full details.
           </p>
@@ -208,7 +208,7 @@ function JobDetailModal({ job, onClose }: { job: IngestionJob; onClose: () => vo
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">Job details</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">Job details</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors rounded-md p-1 -mr-1 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600"

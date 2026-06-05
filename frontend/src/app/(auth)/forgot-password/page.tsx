@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
           </div>
           {step === "form" ? (
             <>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-1">
                 Reset your password
               </h1>
               <p className="text-sm text-gray-500 mb-6">
@@ -120,7 +120,7 @@ export default function ForgotPasswordPage() {
               <div className="flex items-center justify-center w-14 h-14 bg-green-50 rounded-full mx-auto mb-5">
                 <EnvelopeSentIcon />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-900 mb-2">
                 Check your inbox
               </h2>
               <p className="text-sm text-gray-500 mb-1">

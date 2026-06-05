@@ -50,7 +50,7 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Dashboard</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">Dashboard</h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
           Operational overview of your data pipeline. Auto-refreshes every 30s.
         </p>

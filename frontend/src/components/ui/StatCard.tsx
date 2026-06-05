@@ -45,7 +45,7 @@ export function StatCard({
           </span>
         )}
       </div>
-      <p className="text-3xl font-bold text-gray-900 dark:text-slate-100 tabular-nums leading-none mb-1">
+      <p className="text-5xl font-semibold tracking-tight text-gray-900 dark:text-slate-100 tabular-nums leading-none mb-1">
         {formatted}
       </p>
       <p className="text-sm text-gray-500 dark:text-slate-400">{label}</p>
