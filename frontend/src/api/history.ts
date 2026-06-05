@@ -1,5 +1,6 @@
 import { apiFetch } from "./client";
 import { getOnlineOrdersJobs } from "./onlineOrders";
+import { getFeedbackJobs } from "./feedback";
 import type { IngestionJob, PaginatedResponse } from "@/types";
 
 interface PosJobResponse {
@@ -54,17 +55,20 @@ function toPosJob(job: PosJobResponse): IngestionJob {
 export async function getIngestionHistory(
   page = 1
 ): Promise<PaginatedResponse<IngestionJob>> {
-  const [posData, ooData] = await Promise.all([
+  const [posData, ooData, feedbackJobs] = await Promise.all([
     apiFetch<PosJobsPage>(`/ingestion/pos/jobs/?page=${page}`),
     getOnlineOrdersJobs(page),
+    getFeedbackJobs(),
   ]);
 
-  const merged = [...posData.results.map(toPosJob), ...ooData.results].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const merged = [
+    ...posData.results.map(toPosJob),
+    ...ooData.results,
+    ...feedbackJobs,
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return {
-    count: posData.count + ooData.count,
+    count: posData.count + ooData.count + feedbackJobs.length,
     next: posData.next ?? ooData.next,
     previous: posData.previous ?? ooData.previous,
     results: merged,

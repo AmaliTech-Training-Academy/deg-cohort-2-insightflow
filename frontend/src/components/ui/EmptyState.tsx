@@ -10,7 +10,7 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
       <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center mb-4">
         <InboxIcon />
       </div>
-      <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h3>
+      <h3 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">{title}</h3>
       {description && (
         <p className="mt-1.5 text-sm text-gray-500 dark:text-slate-400 max-w-sm">{description}</p>
       )}
