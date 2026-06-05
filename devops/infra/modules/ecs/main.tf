@@ -56,7 +56,7 @@ resource "aws_cloudwatch_log_group" "etl" {
 # ── Security group for ECS tasks ──────────────────────────────────────────────
 resource "aws_security_group" "tasks" {
   name        = "${var.name}-ecs-tasks"
-  description = "ECS Fargate tasks — allow ALB inbound, all outbound"
+  description = "ECS Fargate tasks - allow ALB inbound, all outbound"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -509,6 +509,10 @@ resource "aws_ecs_service" "backend" {
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
 
+  # Wait for the listener rule to associate the target group with the ALB
+  # before AWS validates the load_balancer block above.
+  depends_on = [aws_lb_listener_rule.api]
+
   lifecycle {
     ignore_changes = [task_definition, desired_count]
   }
@@ -538,6 +542,9 @@ resource "aws_ecs_service" "frontend" {
 
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+
+  # Wait for the listener rule to associate the target group with the ALB.
+  depends_on = [aws_lb_listener_rule.frontend]
 
   lifecycle {
     ignore_changes = [task_definition, desired_count]
