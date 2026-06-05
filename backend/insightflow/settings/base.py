@@ -146,8 +146,10 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 if _REDIS_URL.startswith("rediss://"):
-    _SSL_OPTS = {"ssl_cert_reqs": "CERT_NONE"}
-    CELERY_BROKER_TRANSPORT_OPTIONS = _SSL_OPTS
+    import ssl as _ssl
+
+    _SSL_OPTS = {"ssl_cert_reqs": _ssl.CERT_NONE}
+    CELERY_BROKER_USE_SSL = _SSL_OPTS
     CELERY_REDIS_BACKEND_USE_SSL = _SSL_OPTS
 
 SIMPLE_JWT = {

@@ -20,7 +20,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group":         "/insightflow/prod/frontend",
+          "awslogs-group":         "/ecs/insightflow-prod/frontend",
           "awslogs-region":        "AWS_REGION",
           "awslogs-stream-prefix": "frontend"
         }

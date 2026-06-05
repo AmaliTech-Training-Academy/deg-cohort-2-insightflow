@@ -13,9 +13,10 @@
       "essential": true,
       "command": ["celery", "-A", "insightflow", "worker", "--loglevel=info", "--concurrency=2"],
       "environment": [
-        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings" },
+        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings.prod" },
         { "name": "DEBUG",                  "value": "False" },
-        { "name": "DB_PORT",                "value": "5432" }
+        { "name": "DB_PORT",                "value": "5432" },
+        { "name": "MEDIA_ROOT",             "value": "/app/media" }
       ],
       "secrets": [
         { "name": "DJANGO_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/app/secret-key" },
@@ -28,9 +29,10 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group":         "/insightflow/prod/celery-worker",
+          "awslogs-group":         "/ecs/insightflow-prod/celery-worker",
           "awslogs-region":        "AWS_REGION",
-          "awslogs-stream-prefix": "celery-worker"
+          "awslogs-stream-prefix": "celery-worker",
+          "awslogs-create-group":  "true"
         }
       }
     }
