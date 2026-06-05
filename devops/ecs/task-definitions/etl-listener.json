@@ -15,10 +15,10 @@
         { "name": "DB_PORT", "value": "5432" }
       ],
       "secrets": [
-        { "name": "DB_HOST",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:host::" },
-        { "name": "DB_NAME",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:dbname::" },
-        { "name": "DB_USER",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:username::" },
-        { "name": "DB_PASSWORD",      "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/warehouse:password::" },
+        { "name": "DB_HOST",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:host::" },
+        { "name": "DB_NAME",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:dbname::" },
+        { "name": "DB_USER",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:username::" },
+        { "name": "DB_PASSWORD",      "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:password::" },
         { "name": "REDIS_URL",        "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/redis/endpoint:url::" }
       ],
       "logConfiguration": {
@@ -26,7 +26,8 @@
         "options": {
           "awslogs-group":         "/ecs/insightflow-prod/etl-listener",
           "awslogs-region":        "AWS_REGION",
-          "awslogs-stream-prefix": "etl-listener"
+          "awslogs-stream-prefix": "etl-listener",
+          "awslogs-create-group":  "true"
         }
       }
     }
