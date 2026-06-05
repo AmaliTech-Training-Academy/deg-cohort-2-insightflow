@@ -1,6 +1,11 @@
 from django.urls import path
 
-from .views.ingestion_job import IngestionJobStatusView
+from .views.feedback import (
+    FeedbackIngestView,
+    FeedbackJobListView,
+    FeedbackJobStatusView,
+)
+from .views.ingestion_job import IngestionJobListView, IngestionJobStatusView
 from .views.online_orders import (
     OnlineOrdersJobListView,
     OnlineOrdersJobStatusView,
@@ -10,6 +15,14 @@ from .views.pos import POSStagingListCreateView
 
 urlpatterns = [
     path("pos/", POSStagingListCreateView.as_view(), name="pos-list-create"),
+    path("pos/jobs/", IngestionJobListView.as_view(), name="pos-job-list"),
+    path("feedback/trigger/", FeedbackIngestView.as_view(), name="feedback-trigger"),
+    path("feedback/jobs/", FeedbackJobListView.as_view(), name="feedback-job-list"),
+    path(
+        "feedback/jobs/<int:job_id>/status/",
+        FeedbackJobStatusView.as_view(),
+        name="feedback-job-status",
+    ),
     path(
         "<int:job_id>/status/",
         IngestionJobStatusView.as_view(),

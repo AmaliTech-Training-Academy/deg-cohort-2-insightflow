@@ -34,34 +34,38 @@ class AlertManager:
         """Store a new alert."""
         self._alerts.append(alert)
 
-    def flush(self, quality_summary: dict[str, Any]) -> None:
-        """Log all collected alerts and raise on CRITICAL quality.
+    def flush(self, quality_summary: dict[str, Any]) -> bool:
+        """Log all collected alerts and return whether quality is CRITICAL.
 
         The overall severity is CRITICAL when the overall_score falls below the
         threshold for the table in *quality_summary*; otherwise WARNING.
+
+        Bad rows are already filtered out by the transform/cleanse step —
+        this method only handles alerting.  The pipeline continues regardless
+        so that passing rows are still loaded and a CRITICAL alert is emailed.
 
         Parameters
         ----------
         quality_summary:
             Dict produced by ``DataQualityChecker.score_dataframe``.  Must
-            contain ``overall_score`` (float) and optionally ``table`` (str).
+            contain ``overall_score`` (float) and optionally ``source`` (str).
 
-        Raises
-        ------
-        RuntimeError
-            When the resolved severity is CRITICAL.
+        Returns
+        -------
+        bool
+            True when quality is CRITICAL; False otherwise.
+            Callers should send an immediate alert email when True.
         """
         overall_score: float = quality_summary.get("overall_score", 1.0)
-        table: str = quality_summary.get("table", "unknown")
+        table: str = quality_summary.get(
+            "source", quality_summary.get("table", "unknown")
+        )
         threshold = QUALITY_THRESHOLDS.get(table, 0.95)
 
-        resolved_severity = "CRITICAL" if overall_score < threshold else "WARNING"
+        is_critical = overall_score < threshold
 
         for alert in self._alerts:
-            # Upgrade individual alert severity if the overall result is CRITICAL
-            effective_severity = (
-                "CRITICAL" if resolved_severity == "CRITICAL" else alert.severity
-            )
+            effective_severity = "CRITICAL" if is_critical else alert.severity
             log.warning(
                 "[%s] table=%s rule=%s affected_rows=%d detected_at=%s "
                 "sample_values=%s",
@@ -80,17 +84,18 @@ class AlertManager:
                 overall_score,
             )
 
-        if resolved_severity == "CRITICAL":
+        if is_critical:
             summary_msg = (
                 f"Data quality CRITICAL for table='{table}': "
                 f"score={overall_score:.4f} < threshold={threshold:.4f}. "
                 f"total_rows={quality_summary.get('total_rows', '?')}, "
-                f"failed_rows={quality_summary.get('failed_rows', '?')}."
+                f"failed_rows={quality_summary.get('failed_rows', '?')}. "
+                f"Bad rows skipped — pipeline continues with passing rows."
             )
             log.error(summary_msg)
-            raise RuntimeError(summary_msg)
 
         self._alerts.clear()
+        return is_critical
 
     def to_dict(self) -> list[dict[str, Any]]:
         """Return all alerts as a list of plain dicts (for lineage serialisation)."""

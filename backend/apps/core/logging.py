@@ -22,7 +22,7 @@ class JSONFormatter(logging.Formatter):
             log_data["request"] = {
                 "method": record.request.method,
                 "path": record.request.path,
-                "user": str(record.request.user),
+                "user": str(getattr(record.request, "user", "anonymous")),
             }
 
         if hasattr(record, "response_time"):

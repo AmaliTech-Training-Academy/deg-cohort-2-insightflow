@@ -372,11 +372,11 @@ class DataQualityChecker:
         return df["unitPrice"] > 0
 
     def check_date_not_future(self, df: pd.DataFrame, date_col: str) -> pd.Series:
-        """date_col must be <= today."""
+        """date_col must be <= today (UTC-aware comparison)."""
         if date_col not in df.columns:
             return pd.Series(True, index=df.index)
-        today = pd.Timestamp(date.today())
-        col = pd.to_datetime(df[date_col], errors="coerce")
+        today = pd.Timestamp(date.today()).tz_localize("UTC")
+        col = pd.to_datetime(df[date_col], errors="coerce", utc=True)
         return col.notna() & (col <= today)
 
     def check_discount_range(self, df: pd.DataFrame, discount_col: str) -> pd.Series:

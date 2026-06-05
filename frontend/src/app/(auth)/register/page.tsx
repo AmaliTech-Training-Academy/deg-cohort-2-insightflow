@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { register } from "@/api/auth";
-import { setToken } from "@/lib/tokenStorage";
+import { ApiError } from "@/api/client";
+import { setToken, setStoredUser } from "@/lib/tokenStorage";
+import { AuthLayout } from "@/components/layout/AuthLayout";
+
+const inputBase =
+  "block w-full rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3.5 py-3 text-sm text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:focus-visible:ring-green-400 focus-visible:border-transparent transition-colors";
 
 interface FormErrors {
   name?: string;
   email?: string;
   password?: string;
-  confirmPassword?: string;
 }
 
 function validatePassword(pwd: string): boolean {
@@ -23,20 +26,12 @@ function validatePassword(pwd: string): boolean {
   );
 }
 
-const inputBase =
-  "w-full py-2.5 border rounded-lg text-sm text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-700 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors";
-
 export default function RegisterPage() {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,237 +39,161 @@ export default function RegisterPage() {
   function validate(): FormErrors {
     const e: FormErrors = {};
     const trimmedName = name.trim();
-    if (!trimmedName || trimmedName.split(/\s+/).length < 2) e.name = "Enter your full name.";
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid email address.";
-    if (!validatePassword(password)) e.password = "Password is too weak (8+ chars, mix it up).";
-    if (!confirmPassword || confirmPassword !== password) e.confirmPassword = "Passwords don't match.";
+    if (!trimmedName || trimmedName.split(/\s+/).length < 2)
+      e.name = "Enter your full name (first and last).";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      e.email = "Enter a valid email address.";
+    if (!validatePassword(password))
+      e.password = "Use 8+ chars with uppercase, lowercase, and a number or symbol.";
     return e;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const fieldErrors = validate();
-    if (Object.keys(fieldErrors).length > 0) { setErrors(fieldErrors); return; }
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
+      return;
+    }
     setErrors({});
     setServerError("");
     setLoading(true);
     try {
       const res = await register({ name, email, password });
       setToken(res.access);
+      setStoredUser(res.user);
       router.replace("/dashboard");
-    } catch {
-      setServerError("Something went wrong. Please try again.");
+    } catch (err) {
+      console.error("Register error:", err);
+      setServerError(
+        err instanceof ApiError ? err.detail : "Something went wrong. Please try again."
+      );
+
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-slate-900 flex flex-col items-center justify-center relative px-4 py-10 transition-colors">
-      <button
-        type="button"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        aria-label="Toggle dark mode"
-        className="absolute top-4 right-4 p-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-      >
-        {mounted && theme === "dark" ? <SunIcon /> : <MoonIcon />}
-      </button>
+    <AuthLayout>
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100 mb-1">
+          Create your account
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mb-7">
+          Request access to the pipeline operations console.
+        </p>
 
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 px-8 py-8">
-          {/* Logo */}
-          <div className="flex flex-col items-center gap-2 mb-7">
-            <InsightFlowIcon />
-            <span className="text-lg font-semibold text-gray-900 dark:text-slate-100 tracking-tight">
-              InsightFlow
-            </span>
+        {serverError && (
+          <div role="alert" className="mb-5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+            {serverError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Full name</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none"><PersonIcon /></span>
+              <input
+                id="name" type="text" autoComplete="name"
+                value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="Amelia Rivera"
+                className={`${inputBase} pl-10 ${errors.name ? "border-red-400 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10" : ""}`}
+              />
+            </div>
+            {errors.name && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.name}</p>}
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-1">
-            Create your account
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
-            Request access to the pipeline operations console.
-          </p>
-
-          {serverError && (
-            <div className="mb-5 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-              {serverError}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Email</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none"><EnvelopeIcon /></span>
+              <input
+                id="email" type="email" autoComplete="email"
+                value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@insightflow.io"
+                className={`${inputBase} pl-10 ${errors.email ? "border-red-400 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10" : ""}`}
+              />
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            {/* Full name */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                Full name
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
-                  <PersonIcon />
-                </span>
-                <input
-                  id="name" type="text" autoComplete="name"
-                  value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="Amelia Rivera"
-                  className={`${inputBase} pl-9 pr-4 ${errors.name ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-slate-600"}`}
-                />
-              </div>
-              {errors.name && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.name}</p>}
-            </div>
-
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                Email
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
-                  <EnvelopeIcon />
-                </span>
-                <input
-                  id="email" type="email" autoComplete="email"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@insightflow.io"
-                  className={`${inputBase} pl-9 pr-4 ${errors.email ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-slate-600"}`}
-                />
-              </div>
-              {errors.email && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.email}</p>}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
-                  <LockIcon />
-                </span>
-                <input
-                  id="password" type={showPassword ? "text" : "password"} autoComplete="new-password"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                  className={`${inputBase} pl-9 pr-10 ${errors.password ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-slate-600"}`}
-                />
-                <button type="button" onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}>
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              {errors.password
-                ? <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.password}</p>
-                : <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">Use 8+ chars with mixed case, a number or symbol.</p>
-              }
-            </div>
-
-            {/* Confirm password */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                Confirm password
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none">
-                  <LockIcon />
-                </span>
-                <input
-                  id="confirmPassword" type={showConfirm ? "text" : "password"} autoComplete="new-password"
-                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
-                  className={`${inputBase} pl-9 pr-10 ${errors.confirmPassword ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-slate-600"}`}
-                />
-                <button type="button" onClick={() => setShowConfirm((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-                  aria-label={showConfirm ? "Hide password" : "Show password"}>
-                  {showConfirm ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              {errors.confirmPassword && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
-            </div>
-
-            <button
-              type="submit" disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? "Creating account…" : "Create account"}
-            </button>
-          </form>
-
-          <div className="mt-5 pt-5 border-t border-gray-100 dark:border-slate-700 text-center text-sm text-gray-500 dark:text-slate-400">
-            Already have an account?{" "}
-            <Link href="/login" className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors">
-              Sign in
-            </Link>
+            {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email}</p>}
           </div>
-        </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Password</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none"><LockIcon /></span>
+              <input
+                id="password" type={showPassword ? "text" : "password"} autoComplete="new-password"
+                value={password} onChange={(e) => setPassword(e.target.value)}
+                className={`${inputBase} pl-10 pr-10 ${errors.password ? "border-red-400 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10" : ""}`}
+              />
+              <button type="button" onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}>
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
+            {errors.password
+              ? <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.password}</p>
+              : <p className="mt-1.5 text-xs text-gray-400 dark:text-slate-500">8+ chars with mixed case and a number or symbol.</p>
+            }
+          </div>
+
+          <button
+            type="submit" disabled={loading}
+            className="w-full bg-green-600 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-1 text-sm"
+          >
+            {loading ? "Creating account…" : "Create account"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-gray-500 dark:text-slate-400">
+          Already have an account?{" "}
+          <Link href="/login" className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors">
+            Sign in
+          </Link>
+        </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 }
 
-/* ─── Icons ─────────────────────────────────────────────────── */
-function InsightFlowIcon() {
-  return (
-    <div className="w-9 h-9 bg-green-600 rounded-xl flex items-center justify-center shrink-0">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3,12 7,12 9,5 12,19 15,8 17,12 21,12" />
-      </svg>
-    </div>
-  );
-}
-function SunIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="5" />
-      <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-      <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-    </svg>
-  );
-}
-function MoonIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
 function PersonIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
     </svg>
   );
 }
+
 function EnvelopeIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="M22 7L12 13 2 7" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7L12 13 2 7" />
     </svg>
   );
 }
+
 function LockIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
+
 function EyeIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
+
 function EyeOffIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
       <line x1="1" y1="1" x2="23" y2="23" />
     </svg>

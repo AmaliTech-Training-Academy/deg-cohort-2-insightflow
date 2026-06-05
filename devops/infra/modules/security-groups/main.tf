@@ -7,7 +7,7 @@ terraform {
 # ALB — accepts HTTPS/HTTP from the internet
 resource "aws_security_group" "alb" {
   name        = "${var.name}-sg-alb"
-  description = "ALB: inbound 80/443 from internet"
+  description = "ALB: inbound 80/443/3001 from internet"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -22,6 +22,14 @@ resource "aws_security_group" "alb" {
     description = "HTTP (redirected to HTTPS)"
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Metabase dashboard"
+    from_port   = 3001
+    to_port     = 3001
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -61,6 +69,15 @@ resource "aws_security_group" "ec2" {
     cidr_blocks     = var.enable_alb ? [] : []
   }
 
+  ingress {
+    description     = "Metabase from ALB"
+    from_port       = 3001
+    to_port         = 3001
+    protocol        = "tcp"
+    security_groups = var.enable_alb ? [aws_security_group.alb.id] : []
+    cidr_blocks     = var.enable_alb ? [] : []
+  }
+
   # SSH — dev/testing only; never open in production
   dynamic "ingress" {
     for_each = var.enable_ssh ? [1] : []
@@ -70,6 +87,18 @@ resource "aws_security_group" "ec2" {
       to_port     = 22
       protocol    = "tcp"
       cidr_blocks = var.ssh_cidr_blocks
+    }
+  }
+
+  # Redis proxy (socat) — dev troubleshooting only; never open in production
+  dynamic "ingress" {
+    for_each = var.allow_redis_proxy ? [1] : []
+    content {
+      description = "Redis socat proxy - dev troubleshooting only"
+      from_port   = 6380
+      to_port     = 6380
+      protocol    = "tcp"
+      cidr_blocks = var.redis_proxy_cidr_blocks
     }
   }
 
@@ -121,10 +150,10 @@ resource "aws_security_group" "rds" {
   tags = merge(var.tags, { Name = "${var.name}-sg-rds" })
 }
 
-# Redis (ElastiCache) — accepts connections from EC2 only
+# Redis (ElastiCache) — accepts connections from EC2; optionally open wider for dev troubleshooting
 resource "aws_security_group" "redis" {
   name        = "${var.name}-sg-redis"
-  description = "ElastiCache Redis: inbound 6379 from EC2 only"
+  description = "ElastiCache Redis: inbound 6379 from EC2${var.allow_public_redis_access ? ", 0.0.0.0/0 for dev troubleshooting" : ""}"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -133,6 +162,17 @@ resource "aws_security_group" "redis" {
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
+  }
+
+  dynamic "ingress" {
+    for_each = var.allow_public_redis_access ? [1] : []
+    content {
+      description = "Redis public access - dev troubleshooting only"
+      from_port   = 6379
+      to_port     = 6379
+      protocol    = "tcp"
+      cidr_blocks = var.redis_public_cidr_blocks
+    }
   }
 
   egress {

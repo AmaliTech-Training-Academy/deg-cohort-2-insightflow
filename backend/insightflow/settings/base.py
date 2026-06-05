@@ -139,9 +139,9 @@ CELERY_RESULT_EXPIRES = 3600
 
 ONLINE_ORDERS_API_URL = os.environ.get("ONLINE_ORDERS_API_URL", "")
 CELERY_BEAT_SCHEDULE = {
-    "fetch-online-orders-every-2-hours": {
+    "fetch-online-orders-every-5-min": {
         "task": "apps.ingestion.tasks.fetch_online_orders.schedule_online_orders_fetch",
-        "schedule": crontab(minute=0, hour="*/2"),
+        "schedule": crontab(minute="*/5"),
     },
 }
 
@@ -161,6 +161,8 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+EXTERNAL_API_BASE_URL = os.environ.get("EXTERNAL_API_BASE_URL", "")
 
 LOGGING = {
     "version": 1,

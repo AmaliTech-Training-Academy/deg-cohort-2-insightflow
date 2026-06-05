@@ -1,33 +1,34 @@
 services:
   postgres-app:
-    image: postgres:16-alpine
-    container_name: insightflow-app-db
+    image: postgres:15-alpine
+    container_name: insightflow-postgres-app
     environment:
-      POSTGRES_DB: insightflow_app
-      POSTGRES_USER: insightflow
-      POSTGRES_PASSWORD: insightflow_pass
+      POSTGRES_DB: ${DB_NAME:-insightflow_app}
+      POSTGRES_USER: ${DB_USER:-insightflow}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-insightflow_pass}
     ports:
       - "5432:5432"
     volumes:
-      - pgdata-app:/var/lib/postgresql/data
+      - postgres-app-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U insightflow -d insightflow_app"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-insightflow} -d ${DB_NAME:-insightflow_app}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   postgres-warehouse:
-    image: postgres:16-alpine
-    container_name: insightflow-warehouse-db
+    image: postgres:15-alpine
+    container_name: insightflow-postgres-warehouse
     environment:
-      POSTGRES_DB: insightflow_warehouse
-      POSTGRES_USER: insightflow_wh
-      POSTGRES_PASSWORD: insightflow_wh_pass
+      POSTGRES_DB: ${WAREHOUSE_DB_NAME:-insightflow_warehouse}
+      POSTGRES_USER: ${WAREHOUSE_DB_USER:-insightflow_wh}
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD:-insightflow_wh_pass}
+    ports:
+      - "5433:5432"
     volumes:
-      - pgdata-warehouse:/var/lib/postgresql/data
-      - ./data-engineering/warehouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - postgres-warehouse-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U insightflow_wh -d insightflow_warehouse"]
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_DB_USER:-insightflow_wh} -d ${WAREHOUSE_DB_NAME:-insightflow_warehouse}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,6 +58,13 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/frontend
+        awslogs-stream: frontend
+        awslogs-create-group: "true"
     restart: unless-stopped
 
   backend:
@@ -81,17 +89,27 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
     volumes:
       - media-data:/app/media
     depends_on:
       redis:
+        condition: service_healthy
+      postgres-app:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('localhost', 8080), timeout=5).close()\""]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 90s
+      start_period: 300s
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/backend
+        awslogs-stream: backend
+        awslogs-create-group: "true"
     command: >
       sh -c "python manage.py migrate &&
              gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 insightflow.wsgi:application"
@@ -113,13 +131,23 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-insightflow_pass}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       MEDIA_ROOT: ${MEDIA_ROOT:-/app/media}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
     volumes:
       - media-data:/app/media
     depends_on:
       redis:
         condition: service_healthy
+      postgres-app:
+        condition: service_healthy
       backend:
         condition: service_started
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/celery-worker
+        awslogs-stream: celery-worker
+        awslogs-create-group: "true"
     command: celery -A insightflow worker --loglevel=info --concurrency=2
 
   etl:
@@ -128,26 +156,38 @@ services:
       context: ./data-engineering
       dockerfile: Dockerfile
     container_name: insightflow-etl
+    env_file: .env
     environment:
       # Source — OLTP app database
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST:-postgres-app}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-insightflow_app}
+      DB_USER: ${DB_USER:-insightflow}
+      DB_PASSWORD: ${DB_PASSWORD:-insightflow_pass}
       # Target — data warehouse
-      WAREHOUSE_DB_HOST: ${WAREHOUSE_DB_HOST}
-      WAREHOUSE_DB_PORT: ${WAREHOUSE_DB_PORT}
-      WAREHOUSE_DB_NAME: ${WAREHOUSE_DB_NAME}
-      WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER}
-      WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
-      REDIS_URL: ${REDIS_URL}
+      WAREHOUSE_DB_HOST: ${WAREHOUSE_DB_HOST:-postgres-warehouse}
+      WAREHOUSE_DB_PORT: ${WAREHOUSE_DB_PORT:-5432}
+      WAREHOUSE_DB_NAME: ${WAREHOUSE_DB_NAME:-insightflow_warehouse}
+      WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER:-insightflow_wh}
+      WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD:-insightflow_wh_pass}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ETL_BATCH_SIZE: ${ETL_BATCH_SIZE:-1000}
     depends_on:
       redis:
         condition: service_healthy
+      postgres-app:
+        condition: service_healthy
+      postgres-warehouse:
+        condition: service_healthy
       backend:
         condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/etl
+        awslogs-stream: etl
+        awslogs-create-group: "true"
     command: python etl_pipeline.py
 
   etl-listener:
@@ -167,6 +207,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres-app:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/etl-listener
+        awslogs-stream: etl-listener
+        awslogs-create-group: "true"
     restart: unless-stopped
     command: >
       sh -c "python trigger_setup.py install &&
@@ -188,6 +237,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres-warehouse:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-west-1
+        awslogs-group: /insightflow/dev/etl-worker
+        awslogs-stream: etl-worker
+        awslogs-create-group: "true"
     restart: unless-stopped
     command: >
       celery -A celery_app worker
@@ -224,6 +282,8 @@ services:
       dockerfile: Dockerfile
     container_name: insightflow-metabase-setup
     env_file: .env
+    environment:
+      METABASE_URL: http://metabase:3000
     depends_on:
       metabase:
         condition: service_healthy
@@ -237,3 +297,5 @@ volumes:
   redis-data:
   media-data:
   metabase-data:
+  postgres-app-data:
+  postgres-warehouse-data:

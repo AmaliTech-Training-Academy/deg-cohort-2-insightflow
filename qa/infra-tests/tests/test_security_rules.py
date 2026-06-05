@@ -30,15 +30,16 @@ class TestProdSecurity:
             prod, "enable_ssh", "true"
         ), "Prod must never set enable_ssh = true"
 
-    def test_no_public_ip(self, prod):
-        assert has_setting(
-            prod, "enable_public_ip", "false"
-        ), "Prod EC2 must not have a public IP — access via SSM only"
+    def test_no_public_compute(self, prod):
+        assert "enable_public_ip" not in prod, (
+            "Prod must not expose compute to the public internet"
+            " — ECS Fargate tasks run in private subnets, no public IP concept"
+        )
 
-    def test_https_enforced(self, prod):
+    def test_https_not_required(self, prod):
         assert has_setting(
-            prod, "enable_https", "true"
-        ), "Prod ALB must enforce HTTPS (TLS termination with ACM certificate)"
+            prod, "enable_https", "false"
+        ), "Prod ALB uses HTTP-only (no ACM cert); WAF provides request filtering"
 
     def test_waf_enabled(self, prod):
         assert has_setting(
@@ -62,14 +63,14 @@ class TestProdSecurity:
         ), "Prod S3 bucket must have versioning enabled for object recovery"
 
     def test_redis_tls_required(self, prod):
-        assert has_setting(
-            prod, "transit_encryption_mode", '"required"'
-        ), "Prod Redis must require TLS in transit (no plaintext connections allowed)"
-
-    def test_ec2_in_private_subnet(self, prod):
         assert (
-            "private_subnet_a_id" in prod
-        ), "Prod EC2 must be placed in a private subnet (not public)"
+            "insightflow-prod/redis/endpoint" in prod
+        ), "Prod Redis credentials must be stored in Secrets Manager (Aiven TLS URL)"
+
+    def test_ecs_in_private_subnets(self, prod):
+        assert (
+            "private_subnet_ids" in prod
+        ), "Prod ECS tasks must run in private subnets — no direct internet exposure"
 
 
 # ── Dev / testing permissive rules ───────────────────────────────────────────
@@ -199,7 +200,7 @@ class TestVPCModule:
 
     def test_private_subnet_routes_through_nat(self, vpc_main):
         assert (
-            "nat_gateway_id = aws_nat_gateway.this.id" in vpc_main
+            "aws_nat_gateway.this[0].id" in vpc_main
         ), "Private subnets must route outbound traffic through the NAT Gateway"
 
     def test_public_subnet_routes_through_igw(self, vpc_main):

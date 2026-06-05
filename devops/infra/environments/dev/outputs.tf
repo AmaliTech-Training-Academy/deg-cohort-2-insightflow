@@ -10,6 +10,11 @@ output "api_docs_url" {
   value       = "http://${module.alb.alb_dns_name}/api-docs/"
 }
 
+output "metabase_url" {
+  description = "Metabase analytics dashboard"
+  value       = "http://${module.alb.alb_dns_name}:3001"
+}
+
 output "alb_dns_name" {
   description = "Raw ALB hostname"
   value       = module.alb.alb_dns_name

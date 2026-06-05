@@ -35,10 +35,13 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "../qa/frontend-tests/unit/tests/**/*.ts",
+    "../qa/frontend-tests/unit/tests/**/*.tsx"
   ],
   "exclude": [
     "node_modules",
-    ".next/dev"
+    ".next/dev",
+    "vitest.config.mts"
   ]
 }

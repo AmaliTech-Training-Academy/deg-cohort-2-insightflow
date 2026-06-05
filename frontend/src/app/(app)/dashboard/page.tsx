@@ -12,6 +12,8 @@ export default function DashboardPage() {
     queryKey: ["dashboard-stats"],
     queryFn: getDashboardStats,
     refetchInterval: 30_000,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   if (isLoading) {
@@ -21,9 +23,9 @@ export default function DashboardPage() {
           <div className="h-8 w-40 rounded bg-gray-200 animate-pulse mb-2" />
           <div className="h-4 w-64 rounded bg-gray-200 animate-pulse" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-lg border border-gray-200 bg-white shadow-sm p-5 h-28 animate-pulse bg-gray-100" />
+            <div key={i} className="rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-700 shadow-sm p-5 h-28 animate-pulse" />
           ))}
         </div>
         <LoadingSkeleton rows={5} />
@@ -48,26 +50,26 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Dashboard</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">Dashboard</h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
           Operational overview of your data pipeline. Auto-refreshes every 30s.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           label="Jobs Today"
           value={data.jobsToday}
           icon={<BriefcaseIcon />}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
+          iconBg="bg-blue-50 dark:bg-blue-950/40"
+          iconColor="text-blue-600 dark:text-blue-400"
         />
         <StatCard
           label="Successful"
           value={data.jobsSuccessToday}
           icon={<CheckIcon />}
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
+          iconBg="bg-green-50 dark:bg-green-950/40"
+          iconColor="text-green-600 dark:text-green-400"
           trend={
             data.jobsToday > 0
               ? { label: `${successRate}% success rate`, positive: successRate >= 80 }
@@ -78,8 +80,8 @@ export default function DashboardPage() {
           label="Failed"
           value={data.jobsFailedToday}
           icon={<XCircleIcon />}
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
+          iconBg="bg-red-50 dark:bg-red-950/40"
+          iconColor="text-red-600 dark:text-red-400"
           trend={
             data.jobsFailedToday > 0
               ? { label: `${data.jobsFailedToday} need review`, positive: false }
@@ -90,8 +92,8 @@ export default function DashboardPage() {
           label="Records Ingested"
           value={data.recordsIngested}
           icon={<DatabaseIcon />}
-          iconBg="bg-purple-50"
-          iconColor="text-purple-600"
+          iconBg="bg-purple-50 dark:bg-purple-950/40"
+          iconColor="text-purple-600 dark:text-purple-400"
         />
       </div>
 
