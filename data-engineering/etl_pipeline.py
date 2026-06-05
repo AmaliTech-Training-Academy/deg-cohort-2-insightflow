@@ -322,9 +322,9 @@ def run_pipeline(since: date | None = None) -> None:
     )
 
     # Combine for dimension building
-    all_sales = pd.concat(
-        [df for df in [pos_clean, online_clean] if not df.empty],
-        ignore_index=True,
+    _sales_dfs = [df for df in [pos_clean, online_clean] if not df.empty]
+    all_sales = (
+        pd.concat(_sales_dfs, ignore_index=True) if _sales_dfs else pd.DataFrame()
     )
 
     # Collect all transaction dates
