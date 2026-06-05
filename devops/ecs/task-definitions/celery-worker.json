@@ -28,7 +28,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group":         "/insightflow/prod/celery-worker",
+          "awslogs-group":         "/ecs/insightflow-prod/celery-worker",
           "awslogs-region":        "AWS_REGION",
           "awslogs-stream-prefix": "celery-worker"
         }
