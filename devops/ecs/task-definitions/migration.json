@@ -13,7 +13,7 @@
       "essential": true,
       "command": ["python", "manage.py", "migrate", "--noinput"],
       "environment": [
-        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings" },
+        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings.prod" },
         { "name": "DEBUG",                  "value": "False" },
         { "name": "DB_PORT",                "value": "5432" }
       ],
@@ -29,7 +29,8 @@
         "options": {
           "awslogs-group":         "/ecs/insightflow-prod/migration",
           "awslogs-region":        "AWS_REGION",
-          "awslogs-stream-prefix": "migration"
+          "awslogs-stream-prefix": "migration",
+          "awslogs-create-group":  "true"
         }
       }
     }

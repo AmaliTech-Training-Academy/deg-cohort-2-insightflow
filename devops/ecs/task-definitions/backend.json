@@ -15,24 +15,29 @@
         { "containerPort": 8080, "protocol": "tcp" }
       ],
       "environment": [
-        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings" },
+        { "name": "DJANGO_SETTINGS_MODULE", "value": "insightflow.settings.prod" },
         { "name": "DEBUG",                  "value": "False" },
-        { "name": "DB_PORT",                "value": "5432" }
+        { "name": "DB_PORT",                "value": "5432" },
+        { "name": "SECURE_SSL_REDIRECT",    "value": "False" },
+        { "name": "MEDIA_ROOT",             "value": "/app/media" }
       ],
       "secrets": [
-        { "name": "DJANGO_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/app/secret-key" },
-        { "name": "DB_HOST",           "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:host::" },
-        { "name": "DB_NAME",           "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:dbname::" },
-        { "name": "DB_USER",           "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:username::" },
-        { "name": "DB_PASSWORD",       "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:password::" },
-        { "name": "REDIS_URL",         "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/redis/endpoint:url::" }
+        { "name": "DJANGO_SECRET_KEY",      "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/app/secret-key" },
+        { "name": "DB_HOST",                "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:host::" },
+        { "name": "DB_NAME",                "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:dbname::" },
+        { "name": "DB_USER",                "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:username::" },
+        { "name": "DB_PASSWORD",            "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/db/app:password::" },
+        { "name": "REDIS_URL",              "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/redis/endpoint:url::" },
+        { "name": "ALLOWED_HOSTS",          "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/app/allowed-hosts" },
+        { "name": "CORS_ALLOWED_ORIGINS",   "valueFrom": "arn:aws:secretsmanager:AWS_REGION:ACCOUNT_ID:secret:insightflow-prod/app/cors-allowed-origins" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group":         "/ecs/insightflow-prod/backend",
           "awslogs-region":        "AWS_REGION",
-          "awslogs-stream-prefix": "backend"
+          "awslogs-stream-prefix": "backend",
+          "awslogs-create-group":  "true"
         }
       },
       "healthCheck": {
