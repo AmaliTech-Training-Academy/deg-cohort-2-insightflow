@@ -61,10 +61,10 @@ _DSN = (
 
 
 def _redis() -> redis.Redis:  # type: ignore[type-arg]
-    # ssl_cert_reqs=None overrides the "CERT_REQUIRED" string baked into the
-    # Aiven REDIS_URL — redis-py only accepts lowercase values and raises on
-    # the uppercase variant, which silently killed the debounce mechanism.
-    return redis.Redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
+    kwargs: dict = {"decode_responses": True}
+    if REDIS_URL.startswith("rediss://"):
+        kwargs["ssl_cert_reqs"] = None
+    return redis.Redis.from_url(REDIS_URL, **kwargs)
 
 
 def _cancel_pending(r: redis.Redis) -> None:  # type: ignore[type-arg]
