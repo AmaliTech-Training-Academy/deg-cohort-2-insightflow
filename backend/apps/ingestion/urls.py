@@ -5,7 +5,7 @@ from .views.feedback import (
     FeedbackJobListView,
     FeedbackJobStatusView,
 )
-from .views.ingestion_job import IngestionJobStatusView
+from .views.ingestion_job import IngestionJobListView, IngestionJobStatusView
 from .views.online_orders import (
     OnlineOrdersJobListView,
     OnlineOrdersJobStatusView,
@@ -15,6 +15,7 @@ from .views.pos import POSStagingListCreateView
 
 urlpatterns = [
     path("pos/", POSStagingListCreateView.as_view(), name="pos-list-create"),
+    path("pos/jobs/", IngestionJobListView.as_view(), name="pos-job-list"),
     path("feedback/trigger/", FeedbackIngestView.as_view(), name="feedback-trigger"),
     path("feedback/jobs/", FeedbackJobListView.as_view(), name="feedback-job-list"),
     path(

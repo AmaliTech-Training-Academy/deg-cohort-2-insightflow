@@ -137,6 +137,63 @@ class TestOnlineOrdersIngestionService:
 
         assert OnlineOrderLine.objects.filter(lineId=1).count() == 1
 
+    def test_future_order_datetime_is_skipped(self, service):
+        from apps.ingestion.models.online_orders import OnlineOrder
+
+        future_order = {**VALID_ORDER, "orderDatetime": "2099-01-01T00:00:00"}
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
+            mock_pages.return_value = iter([[future_order]])
+            job = service.create_job()
+            service.process_job(job)
+
+        job.refresh_from_db()
+        assert OnlineOrder.objects.filter(onlineOrderId=1).count() == 0
+        assert job.error_orders == 1
+        assert job.valid_orders == 0
+
+    def test_future_hour_same_day_is_skipped(self, service):
+        from datetime import datetime, timedelta
+
+        from apps.ingestion.models.online_orders import OnlineOrder
+
+        future_dt = (datetime.now() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        future_order = {**VALID_ORDER, "orderDatetime": future_dt}
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
+            mock_pages.return_value = iter([[future_order]])
+            job = service.create_job()
+            service.process_job(job)
+
+        job.refresh_from_db()
+        assert OnlineOrder.objects.filter(onlineOrderId=1).count() == 0
+        assert job.error_orders == 1
+
+    def test_future_order_error_report_contains_reason(self, service):
+        future_order = {**VALID_ORDER, "orderDatetime": "2099-06-15T10:00:00"}
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
+            mock_pages.return_value = iter([[future_order]])
+            job = service.create_job()
+            service.process_job(job)
+
+        job.refresh_from_db()
+        assert "future" in str(job.error_report)
+
+    def test_past_order_datetime_is_accepted(self, service):
+        from apps.ingestion.models.online_orders import OnlineOrder
+
+        with patch(
+            "apps.ingestion.services.online_orders_service.iter_all_pages"
+        ) as mock_pages:
+            mock_pages.return_value = iter([[VALID_ORDER]])
+            service.process_job(service.create_job())
+
+        assert OnlineOrder.objects.filter(onlineOrderId=1).exists()
+
 
 @pytest.mark.django_db
 class TestFetchOnlineOrdersTask:

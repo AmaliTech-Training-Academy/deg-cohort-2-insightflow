@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -84,6 +85,7 @@ class OnlineOrdersIngestionService:
         errors = 0
         err_details: list[dict[str, Any]] = []
 
+        now = datetime.now()
         for order_dict in orders:
             errs = validate_order(order_dict)
             if errs:
@@ -98,6 +100,24 @@ class OnlineOrdersIngestionService:
                 logger.warning(
                     "Unparseable orderDatetime for order %s",
                     order_dict.get("onlineOrderId"),
+                )
+                continue
+            if dt.replace(tzinfo=None) > now:
+                errors += 1
+                err_details.append(
+                    {
+                        "order_id": order_dict.get("onlineOrderId"),
+                        "errors": [
+                            {
+                                "field": "orderDatetime",
+                                "error": (
+                                    f"orderDatetime"
+                                    f" '{order_dict['orderDatetime']}'"
+                                    f" is in the future"
+                                ),
+                            }
+                        ],
+                    }
                 )
                 continue
             to_process.append((order_dict, dt))

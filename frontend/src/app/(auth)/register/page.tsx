@@ -64,9 +64,11 @@ export default function RegisterPage() {
       setStoredUser(res.user);
       router.replace("/dashboard");
     } catch (err) {
+      console.error("Register error:", err);
       setServerError(
         err instanceof ApiError ? err.detail : "Something went wrong. Please try again."
       );
+
     } finally {
       setLoading(false);
     }
@@ -75,7 +77,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-1">
+        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100 mb-1">
           Create your account
         </h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 mb-7">

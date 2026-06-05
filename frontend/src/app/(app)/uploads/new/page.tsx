@@ -112,7 +112,7 @@ export default function NewUploadPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">New upload</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">New upload</h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
           Import POS transactions from a CSV export.
         </p>
@@ -454,7 +454,7 @@ function SummaryTile({ label, value, color }: { label: string; value: string; co
     : "text-gray-900 dark:text-slate-100";
   return (
     <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 px-5 py-4">
-      <p className={`text-2xl font-bold tabular-nums leading-none ${valueClass}`}>{value}</p>
+      <p className={`text-3xl font-semibold tracking-tight tabular-nums leading-none ${valueClass}`}>{value}</p>
       <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5">{label}</p>
     </div>
   );
