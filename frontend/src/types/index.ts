@@ -17,6 +17,7 @@ export interface IngestionJob {
   status: IngestionStatus;
   recordsTotal: number | null;
   recordsProcessed: number | null;  // valid_rows — successfully inserted
+  skippedRows?: number;             // duplicate transaction IDs already in DB
   rejectedRows?: number;            // FK misses (unknown store / cashier / product)
   errorRows?: number;               // bad CSV format rows
   errorMessage: string | null;

@@ -423,6 +423,9 @@ function StepSummary({
           {job.recordsTotal != null && (
             <SummaryTile label="Total rows" value={job.recordsTotal.toLocaleString()} color="gray" />
           )}
+          {(job.skippedRows ?? 0) > 0 && (
+            <SummaryTile label="Already exists" value={(job.skippedRows ?? 0).toLocaleString()} color="gray" />
+          )}
           {(job.rejectedRows ?? 0) > 0 && (
             <SummaryTile label="FK misses" value={(job.rejectedRows ?? 0).toLocaleString()} color="yellow" />
           )}

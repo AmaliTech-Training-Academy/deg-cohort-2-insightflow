@@ -23,7 +23,7 @@ interface JobStatusResponse {
   error_rows: number;    // bad CSV format
   created_at: string;
   updated_at: string;
-  error_report?: { row_errors: unknown[] };
+  error_report?: { row_errors?: unknown[]; skipped_duplicates?: number };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -104,6 +104,7 @@ export async function getJobStatus(jobId: string): Promise<IngestionJob> {
     status,
     recordsTotal: raw.total_rows ?? null,
     recordsProcessed: raw.valid_rows ?? null,
+    skippedRows: raw.error_report?.skipped_duplicates ?? 0,
     rejectedRows: raw.rejected_rows,
     errorRows: raw.error_rows,
     errorMessage,
