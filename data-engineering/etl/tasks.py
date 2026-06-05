@@ -45,7 +45,8 @@ def run_etl_task(self) -> None:  # type: ignore[override]
 
     On failure the task retries up to 3 times with a 60-second backoff.
     """
-    r = redis_lib.Redis.from_url(_REDIS_URL, ssl_cert_reqs=None)
+    _ssl_kwargs = {"ssl_cert_reqs": None} if _REDIS_URL.startswith("rediss://") else {}
+    r = redis_lib.Redis.from_url(_REDIS_URL, **_ssl_kwargs)
     lock = r.lock(_LOCK_KEY, timeout=_LOCK_TIMEOUT, blocking_timeout=0)
 
     if not lock.acquire(blocking=False):
