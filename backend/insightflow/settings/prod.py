@@ -14,7 +14,7 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(
 # Django doesn't reject those requests with DisallowedHost.
 try:
     _ec2_private_ip = (
-        urllib.request.urlopen(
+        urllib.request.urlopen(  # nosec B310 — hardcoded EC2 metadata endpoint, not user input
             "http://169.254.169.254/latest/meta-data/local-ipv4", timeout=0.5
         )
         .read()
@@ -23,7 +23,7 @@ try:
     )
     if _ec2_private_ip not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_ec2_private_ip)
-except Exception:
+except Exception:  # nosec B110 — metadata unavailable outside EC2; silent failure is correct
     pass
 
 CORS_ALLOW_ALL_ORIGINS = False
